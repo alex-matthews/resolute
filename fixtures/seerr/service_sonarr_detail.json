@@ -1,0 +1,20 @@
+{
+    "server": {
+        "id": 0,
+        "name": "Sonarr",
+        "is4k": false,
+        "isDefault": true,
+        "activeProfileId": 6,
+        "activeDirectory": "/data/tv"
+    },
+    "profiles": [
+        {
+            "id": 6,
+            "name": "HD-1080p"
+        },
+        {
+            "id": 5,
+            "name": "Ultra-HD"
+        }
+    ]
+}

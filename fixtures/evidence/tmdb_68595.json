@@ -1,0 +1,23 @@
+{
+    "facts": {
+        "canonical_title": "Planet Earth II",
+        "year": 2016,
+        "tmdb_id": 68595,
+        "tvdb_id": 318408,
+        "genres": ["Documentary"],
+        "networks": ["BBC One"],
+        "keywords": ["nature", "wildlife"],
+        "status": "Ended",
+        "number_of_seasons": 1,
+        "number_of_episodes": 6,
+        "episode_run_time_minutes": 60,
+        "vote_average": 9.0,
+        "vote_count": 1500,
+        "popularity": 90.2,
+        "original_language": "en"
+    },
+    "sonarr": {"exists": false},
+    "seerr_request": {},
+    "gaps": [],
+    "sources": ["fixture:planet_earth_ii"]
+}

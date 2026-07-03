@@ -1,0 +1,130 @@
+# API Examples
+
+Base URL in-cluster: `http://tv-decider.default.svc.cluster.local:8130`
+
+## Manual decision
+
+```bash
+curl -s -X POST localhost:8130/api/decisions \
+  -H 'Content-Type: application/json' \
+  -d '{"title": "Severance", "year": 2022, "tmdb_id": 95396, "requester": "alex"}'
+```
+
+```json
+{
+  "decision_id": "01KWMDY8125QKBT392Y06ZNSPN",
+  "title": "Severance",
+  "year": 2022,
+  "final_resolution": "2160p",
+  "confidence": "high",
+  "objective": {"resolution": "2160p", "confidence": "high",
+                "reasons": ["genre/keywords suggest strong visual payoff",
+                             "premium network/platform production values"]},
+  "household": {"resolution": "2160p", "confidence": "high", "reasons": ["..."]},
+  "score": 4.0,
+  "top_reasons": [
+    "genre/keywords suggest strong visual payoff",
+    "premium network/platform production values",
+    "widely acclaimed title"
+  ],
+  "risk_flags": [],
+  "metadata_gaps": [],
+  "mode": "shadow",
+  "action_plan": [
+    {"type": "audit_sonarr_series_profile",
+     "params": {"expected_profile_name": "Ultra-HD"},
+     "requires_approval": false,
+     "note": "after Seerr routes the request, verify Sonarr ended up on the expected profile"}
+  ],
+  "shadow_delta": null,
+  "feedback_options": ["agree", "prefer_1080p", "prefer_2160p", "manual_review"],
+  "model_involvement": {"used": false}
+}
+```
+
+(Response truncated: the full body also carries `request`, `evidence`,
+`score_components`, and `verdict` for auditability.)
+
+## Seerr webhook (what Seerr sends)
+
+```bash
+curl -s -X POST localhost:8130/api/webhooks/seerr \
+  -H 'Content-Type: application/json' \
+  -H 'X-TVD-Token: s3cret' \
+  -d @fixtures/seerr/webhook_media_pending.json
+```
+
+```json
+{
+  "status": "decided",
+  "decision_id": "01KWME0M3H8Y1RZ0Q2W7C9XKPT",
+  "final_resolution": "2160p",
+  "confidence": "high",
+  "mode": "shadow",
+  "action_plan": [
+    {"type": "set_seerr_request_profile_2160p",
+     "params": {"seerr_request_id": 123, "profile_name": "Ultra-HD"},
+     "requires_approval": true,
+     "note": "set Seerr request 123 to profile 'Ultra-HD'"},
+    {"type": "approve_seerr_request",
+     "params": {"seerr_request_id": 123},
+     "requires_approval": true,
+     "note": "approve the Seerr request so it routes to Sonarr"},
+    {"type": "audit_sonarr_series_profile",
+     "params": {"expected_profile_name": "Ultra-HD"},
+     "requires_approval": false,
+     "note": "..."}
+  ],
+  "executed_actions": [],
+  "shadow_delta": "no Sonarr series yet; Seerr request 123 (standard lane, profile_id=6) would get 'Ultra-HD'"
+}
+```
+
+## Execute a decision (approve mode)
+
+```bash
+curl -s -X POST localhost:8130/api/decisions/01KWME0M3H8Y1RZ0Q2W7C9XKPT/execute \
+  -H 'Content-Type: application/json' \
+  -d '{"operator": "alex"}'
+# -> {"decision_id": "01KWME0M...", "executed_actions":
+#     ["set_seerr_request_profile_2160p", "approve_seerr_request"]}
+# 409 if the decision is held, low-confidence, or mode/allow_writes forbids it.
+```
+
+## Plan from an existing Seerr request
+
+```bash
+curl -s -X POST localhost:8130/api/seerr/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"seerr_request_id": 123}'
+```
+
+## Feedback
+
+```bash
+curl -s -X POST localhost:8130/api/feedback \
+  -H 'Content-Type: application/json' \
+  -d '{"decision_id": "01KWME0M3H8Y1RZ0Q2W7C9XKPT",
+       "verdict": "prefer_1080p", "reason_tag": "background_watch",
+       "comment": "nobody will watch this on the good TV"}'
+```
+
+## Sonarr audit
+
+```bash
+curl -s -X POST localhost:8130/api/sonarr/audit \
+  -H 'Content-Type: application/json' \
+  -d '{"decision_id": "01KWME0M3H8Y1RZ0Q2W7C9XKPT"}'
+# -> {"series_found": true, "expected_profile": "Ultra-HD",
+#     "actual_profile": "Ultra-HD", "matches": true, "note": "profile matches decision"}
+```
+
+## Calibration summary
+
+```bash
+curl -s localhost:8130/api/calibration/summary
+# -> {"decisions": 42, "decisions_by_resolution": {"1080p": 30, "2160p": 12},
+#     "feedback": 20, "feedback_by_verdict": {"agree": 17, "prefer_1080p": 3},
+#     "override_reason_tags": {"background_watch": 2, "storage": 1},
+#     "agreement_rate": 0.85}
+```

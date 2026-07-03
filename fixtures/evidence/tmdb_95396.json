@@ -1,0 +1,24 @@
+{
+    "facts": {
+        "canonical_title": "Severance",
+        "year": 2022,
+        "tmdb_id": 95396,
+        "tvdb_id": 371980,
+        "imdb_id": "tt11280740",
+        "genres": ["Drama", "Mystery", "Sci-Fi & Fantasy"],
+        "networks": ["Apple TV+"],
+        "keywords": ["dystopia", "workplace"],
+        "status": "Returning Series",
+        "number_of_seasons": 2,
+        "number_of_episodes": 19,
+        "episode_run_time_minutes": 50,
+        "vote_average": 8.3,
+        "vote_count": 2500,
+        "popularity": 320.5,
+        "original_language": "en"
+    },
+    "sonarr": {"exists": false},
+    "seerr_request": {},
+    "gaps": [],
+    "sources": ["fixture:severance"]
+}

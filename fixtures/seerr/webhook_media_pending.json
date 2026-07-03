@@ -1,0 +1,24 @@
+{
+    "notification_type": "MEDIA_PENDING",
+    "event": "Request Pending Approval",
+    "subject": "Severance (2022)",
+    "message": "A team of office workers whose memories have been surgically divided between their work and personal lives.",
+    "media": {
+        "media_type": "tv",
+        "tmdbId": 95396,
+        "tvdbId": 371980,
+        "status": "PENDING",
+        "status4k": "UNKNOWN"
+    },
+    "request": {
+        "request_id": "123",
+        "requestedBy_email": "alex@example.com",
+        "requestedBy_username": "alex"
+    },
+    "extra": [
+        {
+            "name": "Requested Seasons",
+            "value": "1"
+        }
+    ]
+}

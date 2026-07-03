@@ -1,0 +1,23 @@
+{
+    "facts": {
+        "canonical_title": "The Bear",
+        "year": 2022,
+        "tmdb_id": 136315,
+        "tvdb_id": 416902,
+        "genres": ["Drama"],
+        "networks": ["FX"],
+        "keywords": ["chef", "restaurant", "chicago"],
+        "status": "Returning Series",
+        "number_of_seasons": 3,
+        "number_of_episodes": 28,
+        "episode_run_time_minutes": 30,
+        "vote_average": 8.3,
+        "vote_count": 1200,
+        "popularity": 180.7,
+        "original_language": "en"
+    },
+    "sonarr": {"exists": false},
+    "seerr_request": {},
+    "gaps": [],
+    "sources": ["fixture:the_bear"]
+}

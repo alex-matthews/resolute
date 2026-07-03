@@ -1,0 +1,23 @@
+{
+    "facts": {
+        "canonical_title": "Star Wars: Visions",
+        "year": 2021,
+        "tmdb_id": 114478,
+        "tvdb_id": 393190,
+        "genres": ["Animation", "Sci-Fi & Fantasy"],
+        "networks": ["Disney+"],
+        "keywords": ["anime", "anthology"],
+        "status": "Returning Series",
+        "number_of_seasons": 2,
+        "number_of_episodes": 18,
+        "episode_run_time_minutes": 18,
+        "vote_average": 7.6,
+        "vote_count": 700,
+        "popularity": 60.4,
+        "original_language": "en"
+    },
+    "sonarr": {"exists": false},
+    "seerr_request": {},
+    "gaps": [],
+    "sources": ["fixture:star_wars_visions"]
+}

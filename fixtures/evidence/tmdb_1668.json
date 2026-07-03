@@ -1,0 +1,23 @@
+{
+    "facts": {
+        "canonical_title": "Friends",
+        "year": 1994,
+        "tmdb_id": 1668,
+        "tvdb_id": 79168,
+        "genres": ["Comedy"],
+        "networks": ["NBC"],
+        "keywords": ["sitcom", "new york city"],
+        "status": "Ended",
+        "number_of_seasons": 10,
+        "number_of_episodes": 236,
+        "episode_run_time_minutes": 22,
+        "vote_average": 8.4,
+        "vote_count": 8000,
+        "popularity": 250.1,
+        "original_language": "en"
+    },
+    "sonarr": {"exists": false},
+    "seerr_request": {},
+    "gaps": [],
+    "sources": ["fixture:friends"]
+}

@@ -1,0 +1,38 @@
+[
+    {
+        "name": "severance: premium visual prestige -> 2160p",
+        "request": {"title": "Severance", "year": 2022, "tmdb_id": 95396},
+        "expected_resolution": "2160p",
+        "expect_hold": false
+    },
+    {
+        "name": "friends: archival long-running sitcom -> 1080p",
+        "request": {"title": "Friends", "year": 1994, "tmdb_id": 1668},
+        "expected_resolution": "1080p",
+        "expect_hold": false
+    },
+    {
+        "name": "the bear: story-led ambiguous -> lean 1080p, hold for review",
+        "request": {"title": "The Bear", "year": 2022, "tmdb_id": 136315},
+        "expected_resolution": "1080p",
+        "expect_hold": true
+    },
+    {
+        "name": "planet earth ii: nature documentary showcase -> 2160p",
+        "request": {"title": "Planet Earth II", "year": 2016, "tmdb_id": 68595},
+        "expected_resolution": "2160p",
+        "expect_hold": false
+    },
+    {
+        "name": "star wars visions: priority franchise -> 2160p",
+        "request": {"title": "Star Wars: Visions", "year": 2021, "tmdb_id": 114478},
+        "expected_resolution": "2160p",
+        "expect_hold": false
+    },
+    {
+        "name": "unknown show without metadata -> safe 1080p, hold",
+        "request": {"tmdb_id": 999999},
+        "expected_resolution": "1080p",
+        "expect_hold": true
+    }
+]

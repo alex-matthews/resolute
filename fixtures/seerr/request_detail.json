@@ -1,0 +1,27 @@
+{
+    "id": 123,
+    "status": 1,
+    "is4k": false,
+    "serverId": 0,
+    "profileId": 6,
+    "rootFolder": "/data/tv",
+    "requestedBy": {
+        "id": 2,
+        "username": "alex",
+        "displayName": "alex"
+    },
+    "media": {
+        "id": 55,
+        "mediaType": "tv",
+        "tmdbId": 95396,
+        "tvdbId": 371980,
+        "status": 2
+    },
+    "seasons": [
+        {
+            "id": 900,
+            "seasonNumber": 1,
+            "status": 1
+        }
+    ]
+}

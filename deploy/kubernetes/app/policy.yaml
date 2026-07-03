@@ -1,0 +1,72 @@
+# Household policy: the editable vocabulary the deterministic engine scores with.
+# Keep this file in git; it is reviewed calibration state, not runtime config.
+
+version: 1
+
+# low | medium | high — raise this when the pool fills up; high pressure blocks
+# non-pinned 2160p decisions below high confidence.
+storage_pressure: low
+
+# Above this many requested episodes, 2160p requires high confidence.
+max_episodes_2160p: 80
+
+weights:
+  visual_genre: 1.6
+  network_tier: 1.0
+  era: 0.8
+  acclaim: 1.0
+  episode_burden: 1.4
+  requester_preference: 1.0
+  franchise_priority: 3.0
+  storage_pressure: 1.2
+
+thresholds:
+  uhd_score: 2.0    # household score >= this -> 2160p
+  hd_score: -0.5    # household score <= this -> 1080p; in between -> ambiguous
+  high_confidence_margin: 1.5
+
+visual_genres:
+  - documentary
+  - sci-fi & fantasy
+  - science fiction
+  - animation
+  - action & adventure
+  - war & politics
+
+low_payoff_genres:
+  - talk
+  - news
+  - reality
+  - soap
+  - comedy
+
+premium_networks:
+  - hbo
+  - max
+  - apple tv+
+  - netflix
+  - disney+
+  - amazon
+  - prime video
+
+# Hard pins: guardrails enforce these regardless of score or model opinion.
+franchises_2160p:
+  - star wars
+  - dune
+titles_1080p: []
+
+# Per-requester score bias (positive favors 2160p). Matched against the Seerr
+# display name / username on the request.
+requesters:
+  alex:
+    bias_2160p: 0.5
+    note: prefers showcase quality for prestige titles
+
+feedback_reason_tags:
+  - showcase
+  - background_watch
+  - storage
+  - prestige_exception
+  - kids_content
+  - rewatch_favorite
+  - bad_metadata

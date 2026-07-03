@@ -1,0 +1,30 @@
+{
+    "id": 95396,
+    "name": "Severance",
+    "firstAirDate": "2022-02-17",
+    "overview": "Mark leads a team of office workers whose memories have been surgically divided between their work and personal lives.",
+    "status": "Returning Series",
+    "numberOfSeasons": 2,
+    "numberOfEpisodes": 19,
+    "episodeRunTime": [50],
+    "voteAverage": 8.3,
+    "voteCount": 2500,
+    "popularity": 320.5,
+    "originalLanguage": "en",
+    "genres": [
+        {"id": 18, "name": "Drama"},
+        {"id": 9648, "name": "Mystery"},
+        {"id": 10765, "name": "Sci-Fi & Fantasy"}
+    ],
+    "networks": [
+        {"id": 2552, "name": "Apple TV+"}
+    ],
+    "keywords": [
+        {"id": 1, "name": "dystopia"},
+        {"id": 2, "name": "workplace"}
+    ],
+    "externalIds": {
+        "tvdbId": 371980,
+        "imdbId": "tt11280740"
+    }
+}

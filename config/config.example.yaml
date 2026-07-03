@@ -1,0 +1,44 @@
+# tv-decider service configuration.
+# Every key can also be set via env vars: TVD_MODE, TVD_SEERR__API_KEY,
+# TVD_JUDGE__ENABLED, ... (env vars win over this file).
+
+# Automation mode: shadow | recommend | approve | auto_profile | auto_approve
+# Start with shadow. See docs/rollout.md before changing.
+mode: shadow
+
+# Master write switch. Even auto_* modes cannot write while this is false.
+allow_writes: false
+
+# auto_approve additionally requires this explicit opt-in.
+auto_approve_enabled: false
+
+db_path: data/tv-decider.db
+policy_path: config/policy.yaml
+
+listen_host: 0.0.0.0
+listen_port: 8130
+log_level: INFO
+
+seerr:
+  url: http://seerr.default.svc.cluster.local
+  api_key: ""            # set via TVD_SEERR__API_KEY / ExternalSecret
+  # The two existing Sonarr quality profiles, exactly as Seerr shows them.
+  # tv-decider selects between these; it never creates or edits profiles.
+  profile_name_1080p: "HD-1080p"
+  profile_name_2160p: "Ultra-HD"
+  trigger_notification_types: ["MEDIA_PENDING", "MEDIA_AUTO_APPROVED"]
+  # If set, the Seerr webhook must send this value in the X-TVD-Token header.
+  webhook_shared_secret: ""
+
+sonarr:
+  url: http://sonarr.default.svc.cluster.local
+  api_key: ""            # optional; enables shadow-delta, audit, and fallback planning
+
+judge:
+  enabled: false          # deterministic-only until you opt in
+  provider: openai_compat # any OpenAI-compatible gateway (LiteLLM recommended)
+  base_url: http://litellm.default.svc.cluster.local/v1
+  api_key: ""
+  model: claude-haiku-4-5
+  timeout_seconds: 30
+  judge_ambiguous_only: true  # only consult the model inside the ambiguous score band

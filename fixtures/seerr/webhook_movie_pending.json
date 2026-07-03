@@ -1,0 +1,19 @@
+{
+    "notification_type": "MEDIA_PENDING",
+    "event": "Request Pending Approval",
+    "subject": "Dune: Part Two (2024)",
+    "message": "Paul Atreides unites with Chani and the Fremen.",
+    "media": {
+        "media_type": "movie",
+        "tmdbId": 693134,
+        "tvdbId": null,
+        "status": "PENDING",
+        "status4k": "UNKNOWN"
+    },
+    "request": {
+        "request_id": "124",
+        "requestedBy_email": "alex@example.com",
+        "requestedBy_username": "alex"
+    },
+    "extra": []
+}

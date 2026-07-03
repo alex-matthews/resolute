@@ -1,0 +1,9 @@
+.venv
+.git
+data
+tests
+fixtures
+docs
+deploy
+**/__pycache__
+*.db

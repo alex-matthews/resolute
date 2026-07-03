@@ -1,0 +1,148 @@
+# tv-decider
+
+Seerr-first TV resolution policy engine for a home media stack. When a TV
+request lands in Seerr, tv-decider decides whether it should use the existing
+**1080p** or **2160p** Sonarr quality profile — using deterministic metadata
+scoring, household policy, and an optional schema-validated LLM judge — and
+produces a Seerr request/profile action plan. It ships in **shadow mode**: it
+recommends and records, and writes nothing until you explicitly enable it.
+
+```text
+Seerr (request pending) ──webhook──> tv-decider ──decides──> action plan
+                                                    │  set_seerr_request_profile_2160p
+                                                    │  approve_seerr_request
+                                                    ▼
+                                     executor (mode-gated) ──> Seerr API ──> Sonarr
+```
+
+Key properties:
+
+- **Seerr is the control point.** Decisions happen while the request is
+  pending, before Sonarr ever sees it — which is also the race-avoidance
+  strategy (see [docs/adr/0001](docs/adr/0001-seerr-integration-strategy.md)).
+- **It selects between the two existing profiles** (externally managed by
+  Recyclarr/TRaSH); it never creates or edits profile definitions.
+- **The LLM is optional and bounded**: consulted only for ambiguous cases,
+  strictly schema-validated, clamped by deterministic guardrails, fully
+  audited, and the system works with it disabled.
+- **Every decision, feedback event, webhook, and execution is durable**
+  (SQLite on PVC) and feeds an explicit calibration loop.
+- Standalone CLI/API/service. No Discord, no Costanza, no presentation-layer
+  dependency; those can consume the API later.
+
+## Quick start (local, no network)
+
+```bash
+uv venv && uv pip install -e '.[dev]'
+
+# run the test suite
+.venv/bin/pytest
+
+# decide against bundled fixture evidence
+.venv/bin/tv-decider decide "Severance" --year 2022 --tmdb-id 95396 \
+  --fixtures fixtures/evidence
+
+# run the golden decision suite
+.venv/bin/tv-decider fixtures-test
+```
+
+## Quick start (against your stack)
+
+```bash
+cp config/config.example.yaml config/config.yaml   # edit URLs/profile names
+export TVD_CONFIG_FILE=config/config.yaml
+export TVD_SEERR__API_KEY=...
+export TVD_SONARR__API_KEY=...   # optional: enables shadow deltas + audits
+
+tv-decider serve                 # API on :8130
+tv-decider decide "Severance" --year 2022        # live metadata via Seerr
+tv-decider plan-seerr --seerr-request-id 123     # plan for a pending request
+tv-decider review-pending                        # sweep all pending TV requests
+tv-decider audit-library --limit 50              # shadow-audit Sonarr drift
+```
+
+## Seerr webhook setup
+
+Settings -> Notifications -> Webhook in Seerr:
+
+- **URL**: `http://tv-decider.default.svc.cluster.local:8130/api/webhooks/seerr`
+- **Custom header**: `X-TVD-Token: <your shared secret>` (matches
+  `seerr.webhook_shared_secret`)
+- **Notification types**: enable "Request Pending Approval"
+- **JSON payload** (the canonical template; Seerr expands the `{{...}}` keys):
+
+```json
+{
+    "notification_type": "{{notification_type}}",
+    "event": "{{event}}",
+    "subject": "{{subject}}",
+    "message": "{{message}}",
+    "{{media}}": "media",
+    "{{request}}": "request",
+    "{{extra}}": []
+}
+```
+
+Movies, non-trigger events, and test notifications are acknowledged and
+skipped; every payload is stored for fixture harvesting.
+
+**Prerequisite**: TV requests must land *pending* (disable Seerr TV
+auto-approval for in-scope users), otherwise tv-decider can only audit after
+the fact.
+
+## Automation modes
+
+| Mode | Writes | Behavior |
+| --- | --- | --- |
+| `shadow` (default) | none | decide, log, compare against current state |
+| `recommend` | none | decide and return/publish the action plan |
+| `approve` | on explicit command | `POST /api/decisions/{id}/execute` runs the plan |
+| `auto_profile` | automatic | sets the pending request's profile; approval stays human |
+| `auto_approve` | automatic | also approves; requires `auto_approve_enabled: true` |
+
+All writes additionally require the `allow_writes: true` master switch, and
+held/low-confidence decisions never execute regardless of mode. Follow
+[docs/rollout.md](docs/rollout.md) — shadow first, always.
+
+## How decisions work
+
+1. **Evidence**: show facts via Seerr's TMDB proxy, Seerr request state,
+   Sonarr series state (if it exists). Gaps are tracked, not guessed away.
+2. **Deterministic pre-score** against the editable household policy
+   ([config/policy.example.yaml](config/policy.example.yaml)): visual-payoff
+   genres, network tier, era, acclaim, episode/storage burden, requester bias,
+   franchise pins. Two lanes: *objective* (any household) and *household*
+   (this one).
+3. **Optional LLM judge** for the ambiguous middle band — strict JSON
+   contract, one retry, fails closed to the deterministic result.
+4. **Guardrails** apply hard pins and caps, clamp the judge, and route
+   uncertain cases to `hold_for_manual_review`.
+5. **Planner** emits a Seerr-first action plan; Sonarr mutation exists only as
+   an operator-approved fallback plus a read-only audit.
+6. **Feedback** (`agree` / `prefer_1080p` / `prefer_2160p` / `manual_review` +
+   reason tags) accumulates for the calibration loop
+   ([docs/calibration.md](docs/calibration.md)).
+
+## Repository map
+
+```text
+src/tv_decider/     engine, schemas, seerr/sonarr adapters, judge, store, api, cli
+tests/              83 no-network tests
+fixtures/           seerr/sonarr payloads, evidence bundles, golden expectations
+config/             config + household policy examples
+deploy/kubernetes/  Flux/app-template manifests (home-ops style)
+docs/               architecture, ADR, rollout, deployment, calibration,
+                    API examples, acceptance checklist
+```
+
+## Development
+
+```bash
+.venv/bin/pytest              # full suite
+.venv/bin/ruff check src tests
+.venv/bin/tv-decider fixtures-test          # golden decisions
+docker build -t tv-decider .                # container build
+```
+
+See [docs/architecture.md](docs/architecture.md) for module-level detail and
+[docs/api-examples.md](docs/api-examples.md) for request/response examples.
