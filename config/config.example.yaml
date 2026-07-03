@@ -12,6 +12,10 @@ allow_writes: false
 # auto_approve additionally requires this explicit opt-in.
 auto_approve_enabled: false
 
+# Required for POST /api/decisions/{id}/execute (sent as X-TVD-Operator-Token).
+# While empty, HTTP-mediated execution is disabled; the CLI path still works.
+execute_token: ""
+
 db_path: data/tv-decider.db
 policy_path: config/policy.yaml
 
@@ -26,6 +30,9 @@ seerr:
   # tv-decider selects between these; it never creates or edits profiles.
   profile_name_1080p: "HD-1080p"
   profile_name_2160p: "Ultra-HD"
+  # MEDIA_PENDING requests can be decided and (in write modes) updated/approved.
+  # MEDIA_AUTO_APPROVED requests have already routed to Sonarr: they only ever
+  # produce audit/fallback plans, never Seerr writes (enforced by the planner).
   trigger_notification_types: ["MEDIA_PENDING", "MEDIA_AUTO_APPROVED"]
   # If set, the Seerr webhook must send this value in the X-TVD-Token header.
   webhook_shared_secret: ""

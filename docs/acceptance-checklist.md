@@ -34,7 +34,13 @@ From the cleansheet design + handoff. Verification commands assume
 - [x] Low-confidence / held / insufficient-metadata decisions can never execute
 - [x] Race avoidance: decide while pending, profile-before-approve ordering,
       no tv-decider-initiated Sonarr searches — `docs/adr/0001`
-- [x] Webhook shared-secret support
+- [x] Pending-status enforcement: the planner emits Seerr writes only for
+      pending requests, and the executor/client re-verify status at write time
+      — `tests/test_planner.py`, `tests/test_seerr_client.py`, `tests/test_executor.py`
+- [x] Preserving `PUT /request/{id}` body: routing fields and seasons echoed
+      back, only `profileId` changed, no explicit nulls — `tests/test_seerr_client.py`
+- [x] Webhook shared-secret support; execute endpoint requires a configured
+      operator token (`execute_token`) and is disabled without one
 
 ## Scope boundaries
 
@@ -50,7 +56,8 @@ From the cleansheet design + handoff. Verification commands assume
 - [x] Real package with clear modules (`src/tv_decider/...`), CLI + API over
       one engine
 - [x] No-network tests: fixtures, provider abstraction, guardrails, planner,
-      audit, engine, store, CLI, API, webhook, golden cases — `pytest` (83 tests)
+      audit, engine, store, CLI, API, webhook, wire-level Seerr client, golden
+      cases — `pytest` (96 tests)
 - [x] Durable decision/feedback/audit history: SQLite on PVC + JSONL export
 - [x] Dockerfile, local run commands, config examples
       (`config/*.example.yaml`), home-ops manifests (`deploy/kubernetes/`)

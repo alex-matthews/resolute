@@ -78,6 +78,27 @@ def test_insufficient_metadata_plan():
     ]
 
 
+def test_non_pending_request_gets_no_seerr_write_actions():
+    """Approved/auto-approved requests have already routed; only audit applies."""
+    bundle = EvidenceBundle()
+    bundle.seerr_request = SeerrRequestState(request_id=123, status="approved")
+    bundle.facts.tvdb_id = 371980
+    actions = build_action_plan(_result(), bundle, **PROFILES)
+    assert [a.type for a in actions] == [ActionType.AUDIT_SONARR_SERIES_PROFILE]
+    assert not any(a.is_write for a in actions)
+
+
+def test_non_pending_request_with_sonarr_drift_gets_fallback_plan():
+    bundle = EvidenceBundle()
+    bundle.seerr_request = SeerrRequestState(request_id=123, status="approved")
+    bundle.sonarr = SonarrState(
+        exists=True, series_id=42, quality_profile_id=6, quality_profile_name="HD-1080p"
+    )
+    actions = build_action_plan(_result(Resolution.P2160), bundle, **PROFILES)
+    assert actions[0].type is ActionType.FALLBACK_SET_SONARR_PROFILE_2160P
+    assert actions[0].requires_approval
+
+
 def test_sonarr_fallback_only_without_seerr_request_and_on_mismatch():
     bundle = EvidenceBundle()
     bundle.sonarr = SonarrState(

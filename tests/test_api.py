@@ -9,8 +9,12 @@ from tv_decider.schemas import AutomationMode
 from test_executor import FakeSeerr, FakeSonarr
 
 
+OPERATOR_TOKEN = "test-operator-token"
+
+
 @pytest.fixture
 def api(settings, policy, evidence_source, store):
+    settings.execute_token = OPERATOR_TOKEN
     engine = DecisionEngine(settings, policy, evidence_source)
     executor = Executor(settings, seerr=FakeSeerr(), sonarr=FakeSonarr())
     app = create_app(settings, policy, engine, store, executor)
@@ -145,15 +149,90 @@ def test_feedback_flow(api):
     assert summary["override_reason_tags"] == {"storage": 1}
 
 
+def test_execute_endpoint_requires_operator_token(api):
+    client, _, _ = api
+    decision_id = client.post(
+        "/api/decisions", json={"title": "Severance", "tmdb_id": 95396}
+    ).json()["decision_id"]
+    # no token header
+    assert (
+        client.post(
+            f"/api/decisions/{decision_id}/execute", json={"operator": "alex"}
+        ).status_code
+        == 403
+    )
+    # wrong token
+    assert (
+        client.post(
+            f"/api/decisions/{decision_id}/execute",
+            json={"operator": "alex"},
+            headers={"X-TVD-Operator-Token": "wrong"},
+        ).status_code
+        == 403
+    )
+
+
+def test_execute_endpoint_disabled_without_configured_token(
+    settings, policy, evidence_source, store
+):
+    settings.execute_token = ""
+    engine = DecisionEngine(settings, policy, evidence_source)
+    executor = Executor(settings, seerr=FakeSeerr(), sonarr=FakeSonarr())
+    client = TestClient(create_app(settings, policy, engine, store, executor))
+    decision_id = client.post(
+        "/api/decisions", json={"title": "Severance", "tmdb_id": 95396}
+    ).json()["decision_id"]
+    response = client.post(
+        f"/api/decisions/{decision_id}/execute",
+        json={"operator": "alex"},
+        headers={"X-TVD-Operator-Token": "anything"},
+    )
+    assert response.status_code == 403
+    assert "disabled" in response.json()["detail"]
+
+
 def test_execute_endpoint_blocked_for_held_decision(api):
     client, _, _ = api
     decision_id = client.post(
         "/api/decisions", json={"title": "The Bear", "tmdb_id": 136315}
     ).json()["decision_id"]
     response = client.post(
-        f"/api/decisions/{decision_id}/execute", json={"operator": "alex"}
+        f"/api/decisions/{decision_id}/execute",
+        json={"operator": "alex"},
+        headers={"X-TVD-Operator-Token": OPERATOR_TOKEN},
     )
     assert response.status_code == 409
+
+
+def test_reviews_pending_endpoint(settings, policy, evidence_source, store):
+    class FakeSeerrList(FakeSeerr):
+        def list_requests(self, filter="pending", take=50, skip=0):
+            return [
+                {
+                    "id": 123,
+                    "status": 1,
+                    "media": {"mediaType": "tv", "tmdbId": 95396, "tvdbId": 371980},
+                    "requestedBy": {"username": "alex"},
+                    "seasons": [{"seasonNumber": 1}],
+                },
+                {"id": 124, "status": 1, "media": {"mediaType": "movie", "tmdbId": 1}},
+            ]
+
+    engine = DecisionEngine(settings, policy, evidence_source)
+    client = TestClient(
+        create_app(settings, policy, engine, store, None, seerr=FakeSeerrList())
+    )
+    body = client.post("/api/reviews/pending").json()
+    assert body["reviewed"] == 1  # the movie was skipped
+    assert body["decisions"][0]["final_resolution"] == "2160p"
+    # decisions are stored and retrievable
+    decision_id = body["decisions"][0]["decision_id"]
+    assert client.get(f"/api/decisions/{decision_id}").status_code == 200
+
+
+def test_reviews_pending_without_seerr_client(api):
+    client, _, _ = api
+    assert client.post("/api/reviews/pending").status_code == 503
 
 
 def test_sonarr_audit_endpoint(api):

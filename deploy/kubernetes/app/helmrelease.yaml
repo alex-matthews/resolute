@@ -63,7 +63,9 @@ spec:
                 cpu: 10m
               limits:
                 memory: 256Mi
-      # Scheduled library review: nightly shadow audit of pending requests + drift.
+      # Scheduled library review: nightly sweep of pending Seerr TV requests,
+      # via the API so the SQLite writer and its RWO PVC stay with the API pod.
+      # The endpoint only decides and records; it never executes writes.
       review:
         type: cronjob
         cronjob:
@@ -75,16 +77,17 @@ spec:
             image:
               repository: ghcr.io/alex-matthews/tv-decider
               tag: 0.1.0
-            command: ["tv-decider", "review-pending"]
-            env:
-              TVD_MODE: shadow
-              TVD_DB_PATH: /data/tv-decider.db
-              TVD_POLICY_PATH: /config/policy.yaml
-              TVD_SEERR__URL: http://seerr.default.svc.cluster.local
-              TVD_SONARR__URL: http://sonarr.default.svc.cluster.local
-            envFrom:
-              - secretRef:
-                  name: tv-decider-secret
+            command:
+              - python
+              - -c
+              - |
+                import httpx
+                r = httpx.post(
+                    "http://tv-decider.default.svc.cluster.local:8130/api/reviews/pending",
+                    timeout=300,
+                )
+                r.raise_for_status()
+                print(r.text)
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -110,16 +113,15 @@ spec:
           tv-decider:
             app:
               - path: /data
-          review:
-            app:
-              - path: /data
       policy:
         type: configMap
         name: tv-decider-policy
-        globalMounts:
-          - path: /config/policy.yaml
-            subPath: policy.yaml
-            readOnly: true
+        advancedMounts:
+          tv-decider:
+            app:
+              - path: /config/policy.yaml
+                subPath: policy.yaml
+                readOnly: true
       tmpfs:
         type: emptyDir
         globalMounts:

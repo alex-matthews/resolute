@@ -79,4 +79,4 @@ def create_production_app(config_file: str | None = None):
     from .api.app import create_app
 
     rt = build_runtime(config_file)
-    return create_app(rt.settings, rt.policy, rt.engine, rt.store, rt.executor)
+    return create_app(rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr)

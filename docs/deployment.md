@@ -13,11 +13,10 @@ Components:
 - **Deployment** `tv-decider`: the API, internal-only ClusterIP (no
   HTTPRoute — only Seerr and operators talk to it; add an internal route if
   you want the API reachable from the LAN).
-- **CronJob** `review` (optional): nightly `tv-decider review-pending` shadow
-  sweep. It shares the RWO data PVC with the API pod, which requires both to
-  schedule on the same node; if that's inconvenient, delete the cronjob
-  controller and run reviews via `kubectl exec` or call
-  `POST /api/seerr/plan` from any scheduler instead.
+- **CronJob** `review` (optional): nightly `POST /api/reviews/pending` sweep
+  through the API. It deliberately does not mount the data PVC — the SQLite
+  writer stays single (the API pod), and the endpoint only decides and
+  records, never executes, so it is shadow-safe in every mode.
 - **ConfigMap** `tv-decider-policy` from `app/policy.yaml`: the household
   policy. Editing it in git and letting Flux/reloader roll the pod is the
   intended calibration loop.

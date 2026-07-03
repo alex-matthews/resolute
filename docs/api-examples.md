@@ -82,13 +82,28 @@ curl -s -X POST localhost:8130/api/webhooks/seerr \
 
 ## Execute a decision (approve mode)
 
+Requires `execute_token` to be configured; while it is empty, HTTP-mediated
+execution is disabled entirely (403) and only the CLI path works.
+
 ```bash
 curl -s -X POST localhost:8130/api/decisions/01KWME0M3H8Y1RZ0Q2W7C9XKPT/execute \
   -H 'Content-Type: application/json' \
+  -H 'X-TVD-Operator-Token: <execute_token>' \
   -d '{"operator": "alex"}'
 # -> {"decision_id": "01KWME0M...", "executed_actions":
 #     ["set_seerr_request_profile_2160p", "approve_seerr_request"]}
-# 409 if the decision is held, low-confidence, or mode/allow_writes forbids it.
+# 403 on missing/invalid token; 409 if the decision is held, low-confidence,
+# no longer pending in Seerr, or mode/allow_writes forbids it.
+```
+
+## Scheduled review sweep
+
+```bash
+curl -s -X POST localhost:8130/api/reviews/pending
+# -> {"reviewed": 2, "decisions": [
+#      {"seerr_request_id": 123, "decision_id": "01KW...", "title": "Severance",
+#       "final_resolution": "2160p", "confidence": "high"}, ...]}
+# Decides and records every pending Seerr TV request; never executes writes.
 ```
 
 ## Plan from an existing Seerr request

@@ -13,6 +13,7 @@ from ..config import Policy, Settings
 from ..engine.engine import DecisionEngine
 from ..executor import ExecutionBlocked, Executor
 from ..schemas import AutomationMode, Decision, DecisionRequest, FeedbackIn, Resolution
+from ..seerr.client import SeerrClient, SeerrError
 from ..seerr.webhook import WebhookRejection, normalize_webhook
 from ..sonarr.audit import audit_series_profile
 from ..store.db import Store
@@ -48,6 +49,7 @@ def create_app(
     engine: DecisionEngine,
     store: Store,
     executor: Executor | None = None,
+    seerr: SeerrClient | None = None,
 ) -> FastAPI:
     app = FastAPI(title="tv-decider", version="0.1.0")
     metrics: Counter[str] = Counter()
@@ -95,9 +97,17 @@ def create_app(
         return store.list_decisions(limit=min(limit, 200))
 
     @app.post("/api/decisions/{decision_id}/execute")
-    def execute_decision(decision_id: str, body: ExecuteRequest) -> dict:
+    def execute_decision(decision_id: str, body: ExecuteRequest, request: Request) -> dict:
         if executor is None:
             raise HTTPException(503, "executor not configured")
+        if not settings.execute_token:
+            raise HTTPException(
+                403,
+                "HTTP execution is disabled: set execute_token in config and send it"
+                " as X-TVD-Operator-Token (or execute via the CLI)",
+            )
+        if request.headers.get("X-TVD-Operator-Token") != settings.execute_token:
+            raise HTTPException(403, "invalid operator token")
         decision = store.get_decision(decision_id)
         if decision is None:
             raise HTTPException(404, "decision not found")
@@ -178,6 +188,48 @@ def create_app(
     @app.get("/api/calibration/summary")
     def calibration_summary() -> dict:
         return store.calibration_summary()
+
+    # -- scheduled review ---------------------------------------------------------
+
+    @app.post("/api/reviews/pending")
+    def review_pending(limit: int = 50) -> dict:
+        """Decide every pending Seerr TV request. Decisions are stored, never executed
+        — this endpoint is shadow-safe in every mode, so schedulers can hit it freely."""
+        if seerr is None:
+            raise HTTPException(503, "no Seerr client configured")
+        from ..metadata.source import seerr_request_state_from_api
+        from ..schemas import TriggerSource
+
+        try:
+            pending = seerr.list_requests(filter="pending", take=min(limit, 200))
+        except SeerrError as exc:
+            raise HTTPException(502, f"seerr unavailable: {exc}") from exc
+        reviewed = []
+        for req in pending:
+            media = req.get("media") or {}
+            if media.get("mediaType") != "tv":
+                continue
+            state = seerr_request_state_from_api(req)
+            decision = _decide_and_store(
+                DecisionRequest(
+                    seerr_request_id=state.request_id,
+                    tmdb_id=media.get("tmdbId"),
+                    tvdb_id=media.get("tvdbId"),
+                    trigger=TriggerSource.SCHEDULED_REVIEW,
+                ),
+                None,
+            )
+            reviewed.append(
+                {
+                    "seerr_request_id": state.request_id,
+                    "decision_id": decision.decision_id,
+                    "title": decision.title,
+                    "final_resolution": decision.final_resolution,
+                    "confidence": decision.confidence,
+                }
+            )
+        metrics["reviews_total"] += 1
+        return {"reviewed": len(reviewed), "decisions": reviewed}
 
     # -- planning / audit --------------------------------------------------------
 

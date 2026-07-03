@@ -21,6 +21,14 @@ class SeerrError(Exception):
     pass
 
 
+class RequestNotPendingError(SeerrError):
+    """The request has already been approved/declined/routed; writing is unsafe."""
+
+
+# MediaRequestStatus in Seerr's source: 1=pending, 2=approved, 3=declined, ...
+SEERR_STATUS_PENDING = 1
+
+
 class SeerrClient:
     def __init__(
         self,
@@ -79,15 +87,51 @@ class SeerrClient:
             f"available: {[p.get('name') for p in service.get('profiles', [])]}"
         )
 
+    def assert_pending(self, request_id: int) -> dict:
+        """Fetch the request and refuse to proceed unless it is still pending."""
+        current = self.get_request(request_id)
+        if current.get("status") != SEERR_STATUS_PENDING:
+            raise RequestNotPendingError(
+                f"request {request_id} has status {current.get('status')}, not pending"
+            )
+        return current
+
     # -- writes (executor-only; never called in shadow/recommend) ---------
 
     def update_request_profile(
         self, request_id: int, profile_id: int, seasons: list[int] | None = None
     ) -> dict:
-        """PUT /request/{id}. mediaType is required by the API; seasons preserved when given."""
-        body: dict[str, Any] = {"mediaType": "tv", "profileId": profile_id}
-        if seasons:
-            body["seasons"] = seasons
+        """PUT /request/{id} with a full preserving body.
+
+        Seerr's route handler assigns serverId/rootFolder/languageProfileId/tags
+        directly from the request body and throws if `seasons` is absent, so we
+        fetch the current request first and echo every routing field back,
+        changing only profileId. Refuses non-pending requests: once approved,
+        the request has routed to Sonarr and this write path is the wrong tool.
+        """
+        current = self.assert_pending(request_id)
+        current_seasons = [
+            s["seasonNumber"]
+            for s in (current.get("seasons") or [])
+            if isinstance(s.get("seasonNumber"), int)
+        ]
+        requested_by = current.get("requestedBy") or {}
+        body: dict[str, Any] = {
+            "mediaType": "tv",
+            "profileId": profile_id,
+            "seasons": seasons or current_seasons,
+            "serverId": current.get("serverId"),
+            "rootFolder": current.get("rootFolder"),
+            "languageProfileId": current.get("languageProfileId"),
+            "tags": current.get("tags"),
+            "userId": requested_by.get("id"),
+        }
+        if not body["seasons"]:
+            raise SeerrError(
+                f"request {request_id} has no seasons; Seerr rejects season-less TV updates"
+            )
+        # Never send explicit nulls for fields the request doesn't carry.
+        body = {k: v for k, v in body.items() if v is not None}
         try:
             response = self._client.put(f"/api/v1/request/{request_id}", json=body)
             response.raise_for_status()

@@ -20,7 +20,7 @@ import logging
 
 from .config import Settings
 from .schemas import Action, ActionType, AutomationMode, Confidence, Decision
-from .seerr.client import SeerrClient
+from .seerr.client import RequestNotPendingError, SeerrClient
 from .sonarr.client import SonarrClient
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,12 @@ class Executor:
         for action in decision.action_plan:
             if not self._may_execute(action, mode, operator_approved):
                 continue
-            self._run(action, decision)
+            try:
+                self._run(action, decision)
+            except RequestNotPendingError as exc:
+                # The request state changed between decision and execution
+                # (e.g. a human approved it in Seerr). Stop; audit will catch drift.
+                raise ExecutionBlocked(str(exc)) from exc
             executed.append(action.type)
         return executed
 
@@ -113,6 +118,7 @@ class Executor:
             if self.seerr is None:
                 raise ExecutionBlocked("no Seerr client configured")
             request_id = int(action.params["seerr_request_id"])  # type: ignore[arg-type]
+            self.seerr.assert_pending(request_id)
             self.seerr.approve_request(request_id)
             logger.info("seerr request %s approved", request_id)
         elif action.type in _SONARR_FALLBACK_ACTIONS:

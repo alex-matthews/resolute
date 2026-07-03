@@ -55,11 +55,25 @@ which Sonarr can start searching with the wrong profile. Consequences:
 
 1. Seerr TV auto-approval must be disabled (or scoped away from) users whose
    requests should be decided. `MEDIA_AUTO_APPROVED` events are still accepted
-   as triggers, but they can only produce audit/fallback plans since the
-   request has already routed.
-2. The executor sets the profile *before* approving, in plan order.
+   as triggers, but the planner only emits Seerr write actions for requests
+   whose fetched status is `pending` — non-pending requests can only produce
+   audit/fallback plans since they have already routed.
+2. The executor sets the profile *before* approving, in plan order, and
+   re-verifies pending status at execution time (both before the profile
+   update and before approval), so a human approving in Seerr between
+   decision and execution blocks the write instead of racing it.
 3. The Sonarr fallback path never triggers a search and requires operator
    approval, because a Seerr-initiated search may already be in flight there.
+
+## PUT body semantics
+
+Seerr's `PUT /request/{id}` route handler (`server/routes/request.ts`)
+assigns `serverId`, `rootFolder`, `languageProfileId`, and `tags` **directly
+from the request body**, and the TV branch **throws if `seasons` is absent**.
+tv-decider therefore never sends a partial update: it fetches the current
+request first and echoes every routing field and the current seasons back,
+changing only `profileId`, and never sends explicit nulls. This is covered by
+wire-level tests (`tests/test_seerr_client.py`).
 
 ## Assumptions
 

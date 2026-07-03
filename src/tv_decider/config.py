@@ -147,6 +147,9 @@ class Settings(BaseSettings):
     allow_writes: bool = False
     # auto_approve additionally requires this explicit opt-in.
     auto_approve_enabled: bool = False
+    # Required for POST /api/decisions/{id}/execute (X-TVD-Operator-Token header).
+    # While unset, HTTP-mediated execution is disabled entirely; the CLI still works.
+    execute_token: str = ""
 
     db_path: Path = Path("data/tv-decider.db")
     policy_path: Path = Path("config/policy.yaml")

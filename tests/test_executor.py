@@ -2,17 +2,31 @@ import pytest
 
 from tv_decider.executor import ExecutionBlocked, Executor
 from tv_decider.schemas import ActionType, AutomationMode, DecisionRequest
+from tv_decider.seerr.client import RequestNotPendingError
 
 
 class FakeSeerr:
-    def __init__(self):
+    """Mirrors the real client's contract: writes refuse non-pending requests."""
+
+    def __init__(self, status: int = 1):
+        self.status = status
         self.profile_updates: list[tuple] = []
         self.approvals: list[int] = []
 
     def resolve_profile_id(self, name, sonarr_id=None):
         return {"HD-1080p": 6, "Ultra-HD": 5}[name]
 
+    def get_request(self, request_id):
+        return {"id": request_id, "status": self.status, "seasons": [{"seasonNumber": 1}]}
+
+    def assert_pending(self, request_id):
+        request = self.get_request(request_id)
+        if request["status"] != 1:
+            raise RequestNotPendingError(f"request {request_id} is not pending")
+        return request
+
     def update_request_profile(self, request_id, profile_id, seasons=None):
+        self.assert_pending(request_id)
         self.profile_updates.append((request_id, profile_id, seasons))
         return {}
 
@@ -54,13 +68,13 @@ def seerr_decision(settings, policy, evidence_source):
     return make
 
 
-def _executor(mode, *, allow_writes, auto_approve_enabled=False, settings=None):
+def _executor(mode, *, allow_writes, auto_approve_enabled=False, seerr=None):
     from tv_decider.config import Settings
 
-    s = settings or Settings(
+    s = Settings(
         mode=mode, allow_writes=allow_writes, auto_approve_enabled=auto_approve_enabled
     )
-    return Executor(s, seerr=FakeSeerr(), sonarr=FakeSonarr()), s
+    return Executor(s, seerr=seerr or FakeSeerr(), sonarr=FakeSonarr()), s
 
 
 def test_shadow_mode_never_writes(seerr_decision):
@@ -117,6 +131,18 @@ def test_auto_approve_requires_explicit_opt_in(seerr_decision):
     executed = executor.execute(seerr_decision(AutomationMode.AUTO_APPROVE))
     assert ActionType.APPROVE_SEERR_REQUEST in executed
     assert executor.seerr.approvals == [123]
+
+
+def test_request_no_longer_pending_is_blocked(seerr_decision):
+    # A human approved the request in Seerr between decision and execution.
+    executor, _ = _executor(
+        AutomationMode.APPROVE, allow_writes=True, seerr=FakeSeerr(status=2)
+    )
+    decision = seerr_decision(AutomationMode.APPROVE)
+    with pytest.raises(ExecutionBlocked, match="not pending"):
+        executor.execute(decision, operator_approved=True)
+    assert executor.seerr.profile_updates == []
+    assert executor.seerr.approvals == []
 
 
 def test_low_confidence_decision_is_blocked(seerr_decision):

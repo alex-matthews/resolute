@@ -34,9 +34,11 @@ edit `policy.yaml` weights/pins and keep shadowing).
 
 ## Phase 3 — approve (first writes)
 
-- Set `mode: approve`, `allow_writes: true`.
+- Set `mode: approve`, `allow_writes: true`, and a strong `execute_token`
+  (HTTP execution stays disabled until the token exists).
 - Nothing changes automatically. When a decision looks right, execute it
-  explicitly: `POST /api/decisions/{id}/execute {"operator": "alex"}`.
+  explicitly: `POST /api/decisions/{id}/execute {"operator": "alex"}` with the
+  `X-TVD-Operator-Token` header.
 - The executor sets the request profile, then approves — while the request is
   still pending, so no Sonarr race exists.
 - After a few requests, run `tv-decider audit-sonarr --decision-id ...` to

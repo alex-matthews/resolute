@@ -326,7 +326,7 @@ def serve(
     from .api.app import create_app
 
     rt = build_runtime(config)
-    api = create_app(rt.settings, rt.policy, rt.engine, rt.store, rt.executor)
+    api = create_app(rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr)
     uvicorn.run(
         api,
         host=host or rt.settings.listen_host,

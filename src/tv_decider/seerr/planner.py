@@ -66,7 +66,11 @@ def build_action_plan(
         )
         return actions
 
-    if request_id is not None:
+    # Seerr writes are only safe while the request is pending; once approved it
+    # has already routed to Sonarr and only audit/fallback correction applies.
+    request_is_pending = request_id is not None and evidence.seerr_request.status == "pending"
+
+    if request_is_pending:
         actions.append(
             Action(
                 type=_profile_action(result.resolution),
