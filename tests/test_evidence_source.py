@@ -1,12 +1,12 @@
 """Provider abstraction tests: Seerr/Sonarr responses -> EvidenceBundle, no network."""
 
-from tv_decider.metadata.source import (
+from resolute.metadata.source import (
     LiveEvidenceSource,
     facts_from_seerr_tv,
     seerr_request_state_from_api,
 )
-from tv_decider.schemas import DecisionRequest
-from tv_decider.seerr.client import SeerrError
+from resolute.schemas import DecisionRequest
+from resolute.seerr.client import SeerrError
 
 from conftest import load_fixture
 

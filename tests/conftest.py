@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from tv_decider.config import Policy, RequesterPolicy, Settings
-from tv_decider.engine.engine import DecisionEngine
-from tv_decider.metadata.source import FixtureEvidenceSource
-from tv_decider.store.db import Store
+from resolute.config import Policy, RequesterPolicy, Settings
+from resolute.engine.engine import DecisionEngine
+from resolute.metadata.source import FixtureEvidenceSource
+from resolute.store.db import Store
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 

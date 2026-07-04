@@ -54,7 +54,7 @@ class SonarrClient:
         return self._get(f"/series/{series_id}")
 
     # -- fallback write: correct a series profile post-add ----------------
-    # Race note: only safe when no search is in flight. tv-decider never
+    # Race note: only safe when no search is in flight. resolute never
     # triggers a Sonarr search itself, and this path requires operator approval.
 
     def update_series_profile(self, series_id: int, profile_id: int) -> dict:

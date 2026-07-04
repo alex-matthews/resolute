@@ -3,17 +3,17 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: tv-decider
+  name: resolute
 spec:
   chartRef:
     kind: OCIRepository
-    name: tv-decider
+    name: resolute
   interval: 1h
   values:
     controllers:
-      tv-decider:
+      resolute:
         # SQLite single-writer: keep exactly 1 replica and 1 uvicorn worker
-        # (the default `tv-decider serve` runs one worker). Do not scale this.
+        # (the default `resolute serve` runs one worker). Do not scale this.
         replicas: 1
         strategy: Recreate
         annotations:
@@ -22,25 +22,25 @@ spec:
           app:
             image:
               # Build/push from this repo's Dockerfile; pin by digest once published.
-              repository: ghcr.io/alex-matthews/tv-decider
+              repository: ghcr.io/alex-matthews/resolute
               tag: 0.1.0
             env:
               TZ: Pacific/Auckland
-              TVD_MODE: shadow          # rollout: shadow -> recommend -> approve
-              TVD_ALLOW_WRITES: "false" # master write switch; keep false until docs/rollout.md phase 3
-              TVD_AUTO_APPROVE_ENABLED: "false"
-              TVD_DB_PATH: /data/tv-decider.db
-              TVD_POLICY_PATH: /config/policy.yaml
-              TVD_LISTEN_PORT: &port 8130
-              TVD_SEERR__URL: http://seerr.default.svc.cluster.local
-              TVD_SONARR__URL: http://sonarr.default.svc.cluster.local
-              TVD_SEERR__PROFILE_NAME_1080P: HD-1080p   # match your Sonarr profile names exactly
-              TVD_SEERR__PROFILE_NAME_2160P: Ultra-HD
-              TVD_JUDGE__ENABLED: "false"
-              TVD_JUDGE__BASE_URL: http://litellm.default.svc.cluster.local/v1
+              RESOLUTE_MODE: shadow          # rollout: shadow -> recommend -> approve
+              RESOLUTE_ALLOW_WRITES: "false" # master write switch; keep false until docs/rollout.md phase 3
+              RESOLUTE_AUTO_APPROVE_ENABLED: "false"
+              RESOLUTE_DB_PATH: /data/resolute.db
+              RESOLUTE_POLICY_PATH: /config/policy.yaml
+              RESOLUTE_LISTEN_PORT: &port 8130
+              RESOLUTE_SEERR__URL: http://seerr.default.svc.cluster.local
+              RESOLUTE_SONARR__URL: http://sonarr.default.svc.cluster.local
+              RESOLUTE_SEERR__PROFILE_NAME_1080P: HD-1080p   # match your Sonarr profile names exactly
+              RESOLUTE_SEERR__PROFILE_NAME_2160P: Ultra-HD
+              RESOLUTE_JUDGE__ENABLED: "false"
+              RESOLUTE_JUDGE__BASE_URL: http://litellm.default.svc.cluster.local/v1
             envFrom:
               - secretRef:
-                  name: tv-decider-secret
+                  name: resolute-secret
             probes:
               liveness:
                 enabled: true
@@ -79,7 +79,7 @@ spec:
         containers:
           app:
             image:
-              repository: ghcr.io/alex-matthews/tv-decider
+              repository: ghcr.io/alex-matthews/resolute
               tag: 0.1.0
             command:
               - python
@@ -87,10 +87,10 @@ spec:
               - |
                 import os, httpx
                 headers = {}
-                if os.environ.get("TVD_API_TOKEN"):
-                    headers["X-TVD-Api-Token"] = os.environ["TVD_API_TOKEN"]
+                if os.environ.get("RESOLUTE_API_TOKEN"):
+                    headers["X-Resolute-Api-Token"] = os.environ["RESOLUTE_API_TOKEN"]
                 r = httpx.post(
-                    "http://tv-decider.default.svc.cluster.local:8130/api/reviews/pending",
+                    "http://resolute.default.svc.cluster.local:8130/api/reviews/pending",
                     headers=headers,
                     timeout=300,
                 )
@@ -98,7 +98,7 @@ spec:
                 print(r.text)
             envFrom:
               - secretRef:
-                  name: tv-decider-secret
+                  name: resolute-secret
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -112,23 +112,23 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
     service:
       app:
-        controller: tv-decider
+        controller: resolute
         ports:
           http:
             port: *port
-    # Internal-only: Seerr reaches tv-decider in-cluster; no external route needed.
+    # Internal-only: Seerr reaches resolute in-cluster; no external route needed.
     persistence:
       data:
-        existingClaim: tv-decider
+        existingClaim: resolute
         advancedMounts:
-          tv-decider:
+          resolute:
             app:
               - path: /data
       policy:
         type: configMap
-        name: tv-decider-policy
+        name: resolute-policy
         advancedMounts:
-          tv-decider:
+          resolute:
             app:
               - path: /config/policy.yaml
                 subPath: policy.yaml

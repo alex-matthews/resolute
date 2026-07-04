@@ -66,7 +66,7 @@ class SeerrWebhookPayload(BaseModel):
 
 
 class WebhookRejection(Exception):
-    """Payload is valid but not something tv-decider should decide on."""
+    """Payload is valid but not something resolute should decide on."""
 
 
 def _parse_seasons(extra: list[WebhookExtra]) -> list[int]:

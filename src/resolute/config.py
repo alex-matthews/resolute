@@ -109,7 +109,7 @@ class SeerrSettings(BaseModel):
     trigger_notification_types: list[str] = Field(
         default_factory=lambda: ["MEDIA_PENDING", "MEDIA_AUTO_APPROVED"]
     )
-    webhook_shared_secret: str = ""  # if set, X-TVD-Token header must match
+    webhook_shared_secret: str = ""  # if set, X-Resolute-Token header must match
 
 
 class SonarrSettings(BaseModel):
@@ -133,13 +133,13 @@ class JudgeSettings(BaseModel):
 
 
 class Settings(BaseSettings):
-    """Service settings. Env vars use the TVD_ prefix with __ nesting, e.g.
+    """Service settings. Env vars use the RESOLUTE_ prefix with __ nesting, e.g.
 
-    TVD_MODE=shadow  TVD_SEERR__API_KEY=...  TVD_JUDGE__ENABLED=true
+    RESOLUTE_MODE=shadow  RESOLUTE_SEERR__API_KEY=...  RESOLUTE_JUDGE__ENABLED=true
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="TVD_", env_nested_delimiter="__", extra="ignore"
+        env_prefix="RESOLUTE_", env_nested_delimiter="__", extra="ignore"
     )
 
     mode: AutomationMode = AutomationMode.SHADOW
@@ -147,15 +147,15 @@ class Settings(BaseSettings):
     allow_writes: bool = False
     # auto_approve additionally requires this explicit opt-in.
     auto_approve_enabled: bool = False
-    # Required for POST /api/decisions/{id}/execute (X-TVD-Operator-Token header).
+    # Required for POST /api/decisions/{id}/execute (X-Resolute-Operator-Token header).
     # While unset, HTTP-mediated execution is disabled entirely; the CLI still works.
     execute_token: str = ""
-    # Optional bearer for all other /api/* endpoints (X-TVD-Api-Token header).
+    # Optional bearer for all other /api/* endpoints (X-Resolute-Api-Token header).
     # The webhook keeps its own shared secret; health/ready/metrics stay open.
     # Recommended once the judge is enabled: decision endpoints can spend money.
     api_token: str = ""
 
-    db_path: Path = Path("data/tv-decider.db")
+    db_path: Path = Path("data/resolute.db")
     policy_path: Path = Path("config/policy.yaml")
 
     listen_host: str = "0.0.0.0"
@@ -187,7 +187,7 @@ class Settings(BaseSettings):
 def load_settings(config_file: str | os.PathLike[str] | None = None) -> Settings:
     """Load settings from an optional YAML file, with env vars taking precedence."""
     file_values: dict = {}
-    path = Path(config_file) if config_file else Path(os.environ.get("TVD_CONFIG_FILE", ""))
+    path = Path(config_file) if config_file else Path(os.environ.get("RESOLUTE_CONFIG_FILE", ""))
     if path and path.is_file():
         file_values = yaml.safe_load(path.read_text()) or {}
     return Settings(**file_values)

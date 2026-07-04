@@ -8,7 +8,7 @@ resources:
   - ./helmrelease.yaml
   - ./ocirepository.yaml
 configMapGenerator:
-  - name: tv-decider-policy
+  - name: resolute-policy
     files:
       - policy.yaml
 generatorOptions:

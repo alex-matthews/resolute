@@ -1,10 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from tv_decider.api.app import create_app
-from tv_decider.engine.engine import DecisionEngine
-from tv_decider.executor import Executor
-from tv_decider.schemas import AutomationMode
+from resolute.api.app import create_app
+from resolute.engine.engine import DecisionEngine
+from resolute.executor import Executor
+from resolute.schemas import AutomationMode
 
 from test_executor import FakeSeerr, FakeSonarr
 
@@ -94,13 +94,13 @@ def test_webhook_shared_secret(settings, policy, evidence_source, store, webhook
     client = TestClient(create_app(settings, policy, engine, store, None))
     assert client.post("/api/webhooks/seerr", json=webhook_payload).status_code == 401
     ok = client.post(
-        "/api/webhooks/seerr", json=webhook_payload, headers={"X-TVD-Token": "s3cret"}
+        "/api/webhooks/seerr", json=webhook_payload, headers={"X-Resolute-Token": "s3cret"}
     )
     assert ok.status_code == 200
 
 
 def _auto_settings(tmp_path, mode, **kwargs):
-    from tv_decider.config import Settings
+    from resolute.config import Settings
 
     return Settings(
         mode=mode,
@@ -121,7 +121,7 @@ def test_webhook_auto_profile_executes(policy, evidence_source, store, webhook_p
     body = client.post(
         "/api/webhooks/seerr",
         json=webhook_payload,
-        headers={"X-TVD-Token": "hook-secret"},
+        headers={"X-Resolute-Token": "hook-secret"},
     ).json()
     assert body["executed_actions"] == ["set_seerr_request_profile_2160p"]
     assert executor.seerr.profile_updates == [(123, 5, [1])]
@@ -131,7 +131,7 @@ def test_webhook_auto_profile_executes(policy, evidence_source, store, webhook_p
 def test_auto_write_mode_cannot_be_configured_without_webhook_secret(tmp_path):
     from pydantic import ValidationError
 
-    from tv_decider.config import Settings
+    from resolute.config import Settings
 
     with pytest.raises(ValidationError, match="webhook_shared_secret"):
         Settings(
@@ -189,7 +189,7 @@ def test_execute_endpoint_requires_operator_token(api):
         client.post(
             f"/api/decisions/{decision_id}/execute",
             json={"operator": "alex"},
-            headers={"X-TVD-Operator-Token": "wrong"},
+            headers={"X-Resolute-Operator-Token": "wrong"},
         ).status_code
         == 403
     )
@@ -208,7 +208,7 @@ def test_execute_endpoint_disabled_without_configured_token(
     response = client.post(
         f"/api/decisions/{decision_id}/execute",
         json={"operator": "alex"},
-        headers={"X-TVD-Operator-Token": "anything"},
+        headers={"X-Resolute-Operator-Token": "anything"},
     )
     assert response.status_code == 403
     assert "disabled" in response.json()["detail"]
@@ -222,7 +222,7 @@ def test_execute_endpoint_blocked_for_held_decision(api):
     response = client.post(
         f"/api/decisions/{decision_id}/execute",
         json={"operator": "alex"},
-        headers={"X-TVD-Operator-Token": OPERATOR_TOKEN},
+        headers={"X-Resolute-Operator-Token": OPERATOR_TOKEN},
     )
     assert response.status_code == 409
 
@@ -267,11 +267,11 @@ def test_api_token_gates_decision_endpoints(settings, policy, evidence_source, s
     assert client.post("/api/decisions", json=body).status_code == 401
     assert (
         client.post(
-            "/api/decisions", json=body, headers={"X-TVD-Api-Token": "wrong"}
+            "/api/decisions", json=body, headers={"X-Resolute-Api-Token": "wrong"}
         ).status_code
         == 401
     )
-    ok = client.post("/api/decisions", json=body, headers={"X-TVD-Api-Token": "api-tok"})
+    ok = client.post("/api/decisions", json=body, headers={"X-Resolute-Api-Token": "api-tok"})
     assert ok.status_code == 200
 
     # probes and metrics stay open
@@ -289,7 +289,7 @@ def test_webhook_exempt_from_api_token(
     client = TestClient(create_app(settings, policy, engine, store, None))
     # webhook is governed by its own secret, not the api token
     response = client.post(
-        "/api/webhooks/seerr", json=webhook_payload, headers={"X-TVD-Token": "hook-secret"}
+        "/api/webhooks/seerr", json=webhook_payload, headers={"X-Resolute-Token": "hook-secret"}
     )
     assert response.status_code == 200
 
@@ -312,7 +312,7 @@ def test_partial_execution_is_recorded_durably(
     response = client.post(
         f"/api/decisions/{decision_id}/execute",
         json={"operator": "alex"},
-        headers={"X-TVD-Operator-Token": OPERATOR_TOKEN},
+        headers={"X-Resolute-Operator-Token": OPERATOR_TOKEN},
     )
     assert response.status_code == 502
     assert "set_seerr_request_profile_2160p" in response.json()["detail"]
@@ -338,7 +338,7 @@ def test_webhook_auto_execution_records_partial_and_reports_error(
     body = client.post(
         "/api/webhooks/seerr",
         json=webhook_payload,
-        headers={"X-TVD-Token": "hook-secret"},
+        headers={"X-Resolute-Token": "hook-secret"},
     ).json()
     assert body["executed_actions"] == ["set_seerr_request_profile_2160p"]
     assert "seerr exploded" in body["execution_error"]
@@ -355,7 +355,7 @@ def test_execute_endpoint_409_when_nothing_executable(api):
     response = client.post(
         f"/api/decisions/{decision_id}/execute",
         json={"operator": "alex"},
-        headers={"X-TVD-Operator-Token": OPERATOR_TOKEN},
+        headers={"X-Resolute-Operator-Token": OPERATOR_TOKEN},
     )
     assert response.status_code == 409
     assert "nothing executable" in response.json()["detail"]
@@ -380,5 +380,5 @@ def test_metrics_exposition(api, webhook_payload):
     client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
     client.post("/api/webhooks/seerr", json=webhook_payload)
     text = client.get("/metrics").text
-    assert "tvdecider_decisions_total" in text
-    assert "tvdecider_webhook_decided_total 1" in text
+    assert "resolute_decisions_total" in text
+    assert "resolute_webhook_decided_total 1" in text

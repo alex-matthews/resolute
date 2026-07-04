@@ -4,7 +4,7 @@ the version is stored with every model-backed decision for auditability."""
 PROMPT_VERSION = "judge_v1"
 
 SYSTEM_PROMPT = """\
-You are the subjective judge inside tv-decider, a home media stack policy engine.
+You are the subjective judge inside resolute, a home media stack policy engine.
 Your only job: given evidence about a TV show and a deterministic pre-score, decide
 whether the household should store it at 1080p or 2160p (4K).
 

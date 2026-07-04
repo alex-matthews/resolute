@@ -9,9 +9,9 @@ Writes are earned, not assumed. Each phase has an explicit exit criterion.
   (`GET /api/v1/service/sonarr/0`) and set
   `seerr.profile_name_1080p` / `seerr.profile_name_2160p` accordingly.
 - Disable Seerr auto-approval for TV requests (or for the users in scope), so
-  requests land pending. Without this, tv-decider can only audit after the
+  requests land pending. Without this, resolute can only audit after the
   fact.
-- Run `tv-decider preflight`: verifies Seerr connectivity, resolves both
+- Run `resolute preflight`: verifies Seerr connectivity, resolves both
   profile names to IDs, confirms pending TV requests are visible, and lists
   Sonarr profiles. All checks must pass before moving on.
 
@@ -20,12 +20,12 @@ Writes are earned, not assumed. Each phase has an explicit exit criterion.
 - Deploy with `mode: shadow`, `allow_writes: false`, judge disabled.
 - Configure the Seerr webhook (see README) for "Request Pending Approval".
 - Humans keep approving requests in Seerr exactly as before.
-- tv-decider records a decision per request and a `shadow_delta` comparing its
+- resolute records a decision per request and a `shadow_delta` comparing its
   recommendation to what actually happened.
-- Record feedback: `tv-decider feedback last agree` /
+- Record feedback: `resolute feedback last agree` /
   `prefer_1080p --reason-tag ...` after each real approval.
 
-**Exit criterion:** `tv-decider calibrate` shows ≥ 80% agreement over at least
+**Exit criterion:** `resolute calibrate` shows ≥ 80% agreement over at least
 15 decisions, and `review-overrides` shows no systematic cluster (if it does,
 edit `policy.yaml` weights/pins and keep shadowing).
 
@@ -40,20 +40,20 @@ edit `policy.yaml` weights/pins and keep shadowing).
 - Set `mode: approve`, `allow_writes: true`, and a strong `execute_token`
   (HTTP execution stays disabled until the token exists).
 - **Live contract test first**: with a throwaway pending TV request, run
-  `tv-decider execute <decision-id> --operator alex` and verify in Seerr that
+  `resolute execute <decision-id> --operator alex` and verify in Seerr that
   the profile changed, seasons/root folder/server survived intact, and the
   request approved and routed. This is the one check fixtures cannot give you.
 - Nothing changes automatically. When a decision looks right, execute it
-  explicitly via `tv-decider execute` (CLI/kubectl) or
+  explicitly via `resolute execute` (CLI/kubectl) or
   `POST /api/decisions/{id}/execute {"operator": "alex"}` with the
-  `X-TVD-Operator-Token` header.
+  `X-Resolute-Operator-Token` header.
 - If an execution fails partway (profile set but approval failed), the
   completed actions are still recorded in the `executions` table with a
   `(partial)` operator suffix — check `audit-sonarr` and re-execute or finish
   by hand in Seerr.
 - The executor sets the request profile, then approves — while the request is
   still pending, so no Sonarr race exists.
-- After a few requests, run `tv-decider audit-sonarr --decision-id ...` to
+- After a few requests, run `resolute audit-sonarr --decision-id ...` to
   verify the profile landed.
 
 **Exit criterion:** ≥ 10 operator-executed decisions with zero incorrect

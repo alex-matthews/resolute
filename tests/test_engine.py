@@ -1,9 +1,9 @@
 import json
 
-from tv_decider.engine.engine import DecisionEngine
-from tv_decider.judge.judge import Judge
-from tv_decider.judge.provider import StaticProvider
-from tv_decider.schemas import (
+from resolute.engine.engine import DecisionEngine
+from resolute.judge.judge import Judge
+from resolute.judge.provider import StaticProvider
+from resolute.schemas import (
     ActionType,
     AutomationMode,
     Confidence,

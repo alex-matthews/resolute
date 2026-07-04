@@ -52,7 +52,7 @@ def create_app(
     executor: Executor | None = None,
     seerr: SeerrClient | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="tv-decider", version="0.1.0")
+    app = FastAPI(title="resolute", version="0.1.0")
     metrics: Counter[str] = Counter()
 
     if settings.api_token:
@@ -62,7 +62,7 @@ def create_app(
         async def require_api_token(request: Request, call_next):
             path = request.url.path
             if path.startswith("/api/") and path != "/api/webhooks/seerr":
-                if request.headers.get("X-TVD-Api-Token") != settings.api_token:
+                if request.headers.get("X-Resolute-Api-Token") != settings.api_token:
                     return JSONResponse({"detail": "invalid api token"}, status_code=401)
             return await call_next(request)
 
@@ -85,8 +85,8 @@ def create_app(
 
     @app.get("/metrics")
     def metrics_endpoint() -> Response:
-        lines = ["# TYPE tvdecider_events counter"]
-        lines += [f"tvdecider_{key} {value}" for key, value in sorted(metrics.items())]
+        lines = ["# TYPE resolute_events counter"]
+        lines += [f"resolute_{key} {value}" for key, value in sorted(metrics.items())]
         return Response("\n".join(lines) + "\n", media_type="text/plain")
 
     # -- decisions -----------------------------------------------------------
@@ -116,9 +116,9 @@ def create_app(
             raise HTTPException(
                 403,
                 "HTTP execution is disabled: set execute_token in config and send it"
-                " as X-TVD-Operator-Token (or execute via the CLI)",
+                " as X-Resolute-Operator-Token (or execute via the CLI)",
             )
-        if request.headers.get("X-TVD-Operator-Token") != settings.execute_token:
+        if request.headers.get("X-Resolute-Operator-Token") != settings.execute_token:
             raise HTTPException(403, "invalid operator token")
         decision = store.get_decision(decision_id)
         if decision is None:
@@ -150,7 +150,7 @@ def create_app(
     @app.post("/api/webhooks/seerr")
     async def seerr_webhook(request: Request) -> dict:
         secret = settings.seerr.webhook_shared_secret
-        if secret and request.headers.get("X-TVD-Token") != secret:
+        if secret and request.headers.get("X-Resolute-Token") != secret:
             metrics["webhook_unauthorized_total"] += 1
             raise HTTPException(401, "invalid webhook token")
         payload: dict[str, Any] = await request.json()

@@ -1,11 +1,11 @@
 import json
 
-from tv_decider.engine.features import FeatureSet
-from tv_decider.engine.policy import prescore
-from tv_decider.judge.judge import Judge
-from tv_decider.judge.prompts import PROMPT_VERSION
-from tv_decider.judge.provider import StaticProvider
-from tv_decider.schemas import EvidenceBundle
+from resolute.engine.features import FeatureSet
+from resolute.engine.policy import prescore
+from resolute.judge.judge import Judge
+from resolute.judge.prompts import PROMPT_VERSION
+from resolute.judge.provider import StaticProvider
+from resolute.schemas import EvidenceBundle
 
 VALID = json.dumps(
     {

@@ -1,4 +1,4 @@
-"""Thin Seerr API client covering the seams tv-decider needs.
+"""Thin Seerr API client covering the seams resolute needs.
 
 Endpoints verified against the Seerr v3 OpenAPI spec (seerr-team/seerr):
 - GET  /api/v1/request/{id}                 read a request

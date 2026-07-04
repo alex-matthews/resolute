@@ -1,8 +1,8 @@
 import pytest
 
-from tv_decider.executor import ExecutionBlocked, ExecutionFailed, Executor
-from tv_decider.schemas import ActionType, AutomationMode, DecisionRequest
-from tv_decider.seerr.client import RequestNotPendingError, SeerrError
+from resolute.executor import ExecutionBlocked, ExecutionFailed, Executor
+from resolute.schemas import ActionType, AutomationMode, DecisionRequest
+from resolute.seerr.client import RequestNotPendingError, SeerrError
 
 
 class FakeSeerr:
@@ -50,8 +50,8 @@ class FakeSonarr:
 @pytest.fixture
 def seerr_decision(settings, policy, evidence_source):
     """Decision for a pending Seerr request, built by the real engine."""
-    from tv_decider.engine.engine import DecisionEngine
-    from tv_decider.schemas import EvidenceBundle, SeerrRequestState
+    from resolute.engine.engine import DecisionEngine
+    from resolute.schemas import EvidenceBundle, SeerrRequestState
 
     class RequestEvidenceSource:
         def collect(self, request):
@@ -69,7 +69,7 @@ def seerr_decision(settings, policy, evidence_source):
 
 
 def _executor(mode, *, allow_writes, auto_approve_enabled=False, seerr=None):
-    from tv_decider.config import Settings
+    from resolute.config import Settings
 
     s = Settings(
         mode=mode,
@@ -196,7 +196,7 @@ def test_low_confidence_decision_is_blocked(seerr_decision):
 
 
 def test_held_decision_is_blocked(settings, policy, evidence_source):
-    from tv_decider.engine.engine import DecisionEngine
+    from resolute.engine.engine import DecisionEngine
 
     engine = DecisionEngine(settings, policy, evidence_source)
     decision = engine.decide(

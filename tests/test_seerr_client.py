@@ -10,7 +10,7 @@ import json
 import httpx
 import pytest
 
-from tv_decider.seerr.client import RequestNotPendingError, SeerrClient, SeerrError
+from resolute.seerr.client import RequestNotPendingError, SeerrClient, SeerrError
 
 from conftest import load_fixture
 

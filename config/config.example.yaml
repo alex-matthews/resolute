@@ -1,6 +1,6 @@
-# tv-decider service configuration.
-# Every key can also be set via env vars: TVD_MODE, TVD_SEERR__API_KEY,
-# TVD_JUDGE__ENABLED, ... (env vars win over this file).
+# resolute service configuration.
+# Every key can also be set via env vars: RESOLUTE_MODE, RESOLUTE_SEERR__API_KEY,
+# RESOLUTE_JUDGE__ENABLED, ... (env vars win over this file).
 
 # Automation mode: shadow | recommend | approve | auto_profile | auto_approve
 # Start with shadow. See docs/rollout.md before changing.
@@ -12,16 +12,16 @@ allow_writes: false
 # auto_approve additionally requires this explicit opt-in.
 auto_approve_enabled: false
 
-# Required for POST /api/decisions/{id}/execute (sent as X-TVD-Operator-Token).
-# While empty, HTTP-mediated execution is disabled; `tv-decider execute` still works.
+# Required for POST /api/decisions/{id}/execute (sent as X-Resolute-Operator-Token).
+# While empty, HTTP-mediated execution is disabled; `resolute execute` still works.
 execute_token: ""
 
-# Optional bearer for all other /api/* endpoints (sent as X-TVD-Api-Token).
+# Optional bearer for all other /api/* endpoints (sent as X-Resolute-Api-Token).
 # The webhook keeps its own shared secret; health/ready/metrics stay open.
 # Recommended once the judge is enabled, since decision endpoints can spend money.
 api_token: ""
 
-db_path: data/tv-decider.db
+db_path: data/resolute.db
 policy_path: config/policy.yaml
 
 listen_host: 0.0.0.0
@@ -30,16 +30,16 @@ log_level: INFO
 
 seerr:
   url: http://seerr.default.svc.cluster.local
-  api_key: ""            # set via TVD_SEERR__API_KEY / ExternalSecret
+  api_key: ""            # set via RESOLUTE_SEERR__API_KEY / ExternalSecret
   # The two existing Sonarr quality profiles, exactly as Seerr shows them.
-  # tv-decider selects between these; it never creates or edits profiles.
+  # resolute selects between these; it never creates or edits profiles.
   profile_name_1080p: "HD-1080p"
   profile_name_2160p: "Ultra-HD"
   # MEDIA_PENDING requests can be decided and (in write modes) updated/approved.
   # MEDIA_AUTO_APPROVED requests have already routed to Sonarr: they only ever
   # produce audit/fallback plans, never Seerr writes (enforced by the planner).
   trigger_notification_types: ["MEDIA_PENDING", "MEDIA_AUTO_APPROVED"]
-  # If set, the Seerr webhook must send this value in the X-TVD-Token header.
+  # If set, the Seerr webhook must send this value in the X-Resolute-Token header.
   # Mandatory for auto_profile/auto_approve with allow_writes: the service
   # refuses to start an unauthenticated write-capable webhook.
   webhook_shared_secret: ""

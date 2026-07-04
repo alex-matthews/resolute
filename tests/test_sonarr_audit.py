@@ -1,5 +1,5 @@
-from tv_decider.schemas import Resolution, SonarrState
-from tv_decider.sonarr.audit import audit_series_profile, sonarr_state_from_series
+from resolute.schemas import Resolution, SonarrState
+from resolute.sonarr.audit import audit_series_profile, sonarr_state_from_series
 
 from conftest import load_fixture
 

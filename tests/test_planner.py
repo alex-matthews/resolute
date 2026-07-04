@@ -1,5 +1,5 @@
-from tv_decider.engine.guardrails import GuardrailResult
-from tv_decider.schemas import (
+from resolute.engine.guardrails import GuardrailResult
+from resolute.schemas import (
     ActionType,
     Confidence,
     EvidenceBundle,
@@ -7,7 +7,7 @@ from tv_decider.schemas import (
     SeerrRequestState,
     SonarrState,
 )
-from tv_decider.seerr.planner import build_action_plan, shadow_delta
+from resolute.seerr.planner import build_action_plan, shadow_delta
 
 PROFILES = {"profile_name_1080p": "HD-1080p", "profile_name_2160p": "Ultra-HD"}
 

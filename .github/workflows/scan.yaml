@@ -1,0 +1,79 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Scan
+
+# Policy: report-only for now. Findings are uploaded as SARIF (code-scanning
+# alerts) but do not fail PRs. Rationale: on a slim base image the high/critical
+# feed churns weekly with CVEs that have no upstream fix yet; failing unrelated
+# PRs on that noise trains people to ignore red CI. Remediation is automated
+# instead — Renovate bumps the digest-pinned base image and the uv lockfile as
+# fixes land. Revisit (flip exit-code to 1 for fixable high/critical) after the
+# shadow deployment settles.
+
+on:
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: 0 5 * * 1
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  filesystem:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run Trivy (deps, secrets, IaC)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-fs.sarif
+          exit-code: "0"
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@fb84f6228fd846d3c392887f22b18ce2d9139495 # v4
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  image:
+    name: Trivy Image Scan
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Run Trivy against the published image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository }}:main
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-image.sarif
+          exit-code: "0"
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@fb84f6228fd846d3c392887f22b18ce2d9139495 # v4
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image

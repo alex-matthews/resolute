@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from tv_decider.config import Settings
-from tv_decider.schemas import AutomationMode
+from resolute.config import Settings
+from resolute.schemas import AutomationMode
 
 
 @pytest.mark.parametrize(

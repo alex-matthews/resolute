@@ -21,7 +21,7 @@ from .schemas import (
 )
 from .store.db import Store
 
-app = typer.Typer(help="tv-decider: Seerr-first 1080p vs 2160p TV decision engine")
+app = typer.Typer(help="resolute: Seerr-first 1080p vs 2160p TV decision engine")
 
 _config_option = typer.Option(None, "--config", help="Path to config YAML")
 _fixtures_option = typer.Option(

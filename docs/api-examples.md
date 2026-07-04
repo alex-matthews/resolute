@@ -1,10 +1,10 @@
 # API Examples
 
-Base URL in-cluster: `http://tv-decider.default.svc.cluster.local:8130`
+Base URL in-cluster: `http://resolute.default.svc.cluster.local:8130`
 
 If `api_token` is configured, every `/api/*` call below (except the webhook,
 which uses its own shared secret) additionally needs
-`-H 'X-TVD-Api-Token: <api_token>'`.
+`-H 'X-Resolute-Api-Token: <api_token>'`.
 
 ## Manual decision
 
@@ -54,7 +54,7 @@ curl -s -X POST localhost:8130/api/decisions \
 ```bash
 curl -s -X POST localhost:8130/api/webhooks/seerr \
   -H 'Content-Type: application/json' \
-  -H 'X-TVD-Token: s3cret' \
+  -H 'X-Resolute-Token: s3cret' \
   -d @fixtures/seerr/webhook_media_pending.json
 ```
 
@@ -92,7 +92,7 @@ execution is disabled entirely (403) and only the CLI path works.
 ```bash
 curl -s -X POST localhost:8130/api/decisions/01KWME0M3H8Y1RZ0Q2W7C9XKPT/execute \
   -H 'Content-Type: application/json' \
-  -H 'X-TVD-Operator-Token: <execute_token>' \
+  -H 'X-Resolute-Operator-Token: <execute_token>' \
   -d '{"operator": "alex"}'
 # -> {"decision_id": "01KWME0M...", "executed_actions":
 #     ["set_seerr_request_profile_2160p", "approve_seerr_request"]}
@@ -106,8 +106,8 @@ The same execution is available from the CLI (e.g. via `kubectl exec` into
 the pod), which shares the write gates and partial-recording behavior:
 
 ```bash
-tv-decider execute 01KWME0M3H8Y1RZ0Q2W7C9XKPT --operator alex
-tv-decider execute last --operator alex --yes   # skip confirmation
+resolute execute 01KWME0M3H8Y1RZ0Q2W7C9XKPT --operator alex
+resolute execute last --operator alex --yes   # skip confirmation
 ```
 
 ## Scheduled review sweep

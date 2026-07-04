@@ -1,4 +1,4 @@
-from tv_decider.schemas import DecisionRequest, FeedbackIn, FeedbackVerdict
+from resolute.schemas import DecisionRequest, FeedbackIn, FeedbackVerdict
 
 
 def _decision(engine, title="Severance", tmdb_id=95396):

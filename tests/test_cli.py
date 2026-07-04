@@ -3,7 +3,7 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from tv_decider.cli import app
+from resolute.cli import app
 
 runner = CliRunner()
 
@@ -12,8 +12,8 @@ runner = CliRunner()
 def env(tmp_path, fixtures_dir):
     """Environment that keeps CLI runs offline and inside tmp_path."""
     return {
-        "TVD_DB_PATH": str(tmp_path / "cli.db"),
-        "TVD_POLICY_PATH": str(fixtures_dir.parent / "config" / "policy.yaml"),
+        "RESOLUTE_DB_PATH": str(tmp_path / "cli.db"),
+        "RESOLUTE_POLICY_PATH": str(fixtures_dir.parent / "config" / "policy.yaml"),
     }
 
 

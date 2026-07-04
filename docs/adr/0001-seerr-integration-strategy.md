@@ -5,7 +5,7 @@ Date: 2026-07-04
 
 ## Context
 
-tv-decider must decide whether a Seerr TV request should use the existing
+resolute must decide whether a Seerr TV request should use the existing
 1080p or 2160p Sonarr quality profile, and apply that decision somewhere.
 Three candidate strategies were identified in the preflight review:
 
@@ -40,7 +40,7 @@ deployed version v3.3.0):
 
 **Strategy A is the write path; strategy B is the default posture.**
 
-tv-decider listens for `MEDIA_PENDING` webhooks, decides while the request is
+resolute listens for `MEDIA_PENDING` webhooks, decides while the request is
 pending, and produces an action plan of
 `set_seerr_request_profile_*` -> `approve_seerr_request`. Whether that plan
 executes is governed by the automation mode (`shadow` by default; see
@@ -70,7 +70,7 @@ which Sonarr can start searching with the wrong profile. Consequences:
 Seerr's `PUT /request/{id}` route handler (`server/routes/request.ts`)
 assigns `serverId`, `rootFolder`, `languageProfileId`, and `tags` **directly
 from the request body**, and the TV branch **throws if `seasons` is absent**.
-tv-decider therefore never sends a partial update: it fetches the current
+resolute therefore never sends a partial update: it fetches the current
 request first and echoes every routing field and the current seasons back,
 changing only `profileId`, and never sends explicit nulls. This is covered by
 wire-level tests (`tests/test_seerr_client.py`).
@@ -78,7 +78,7 @@ wire-level tests (`tests/test_seerr_client.py`).
 ## Assumptions
 
 - The Seerr API key used has `MANAGE_REQUESTS`/admin rights.
-- The two Sonarr profiles are externally managed (TRaSH/Recyclarr); tv-decider
+- The two Sonarr profiles are externally managed (TRaSH/Recyclarr); resolute
   only references their names (config) and resolves IDs at runtime.
 - A single non-4K Sonarr server holds one copy of each series and both
   profiles ("one server, per-request profile" Seerr topology).

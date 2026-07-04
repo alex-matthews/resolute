@@ -1,9 +1,12 @@
 .venv
 .git
+.github
+.mise
 data
 tests
 fixtures
 docs
 deploy
+scripts
 **/__pycache__
 *.db

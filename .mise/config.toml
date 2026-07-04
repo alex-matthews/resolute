@@ -1,0 +1,60 @@
+[tools]
+python = "3.14.6"
+uv = "0.11.24"
+helm = "4.2.2"
+kubeconform = "0.7.0"
+hadolint = "2.14.0"
+actionlint = "1.7.10"
+zizmor = "1.26.1"
+yq = "4.53.3"
+
+[tasks.sync]
+description = "Install locked dependencies (incl. dev group)"
+run = "uv sync --locked"
+
+[tasks.test]
+description = "Run the test suite"
+run = "uv run pytest"
+
+[tasks.lint]
+description = "Run ruff over source and tests"
+run = "uv run ruff check src tests"
+
+[tasks.lint-fix]
+description = "Run ruff with --fix"
+run = "uv run ruff check --fix src tests"
+
+[tasks.golden]
+description = "Run the golden decision fixtures"
+run = "RESOLUTE_DB_PATH=$(mktemp -d)/golden.db uv run resolute fixtures-test"
+
+[tasks.dockerfile-lint]
+description = "Lint the Dockerfile"
+run = "hadolint Dockerfile"
+
+[tasks.workflow-lint]
+description = "Lint and security-check GitHub workflows"
+run = """
+actionlint
+zizmor .github/workflows
+"""
+
+[tasks.helm-render]
+description = "Render the app-template HelmRelease values with Helm"
+run = """
+VERSION=$(yq '.spec.ref.tag' deploy/kubernetes/app/ocirepository.yaml)
+yq '.spec.values' deploy/kubernetes/app/helmrelease.yaml > /tmp/resolute-values.yaml
+helm template resolute oci://ghcr.io/bjw-s-labs/helm/app-template --version "${VERSION}" -f /tmp/resolute-values.yaml
+"""
+
+[tasks.kubeconform]
+description = "Validate rendered manifests and Flux/CRD resources with kubeconform"
+run = "bash scripts/kubeconform.sh"
+
+[tasks.build]
+description = "Build the container image locally"
+run = "docker build -t resolute:local ."
+
+[tasks.ci]
+description = "Everything CI runs, locally"
+depends = ["lint", "test", "golden", "dockerfile-lint", "workflow-lint", "kubeconform"]

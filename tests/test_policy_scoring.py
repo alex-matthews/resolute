@@ -1,7 +1,7 @@
-from tv_decider.engine.features import extract_features
-from tv_decider.engine.policy import prescore
-from tv_decider.metadata.source import FixtureEvidenceSource
-from tv_decider.schemas import Confidence, DecisionRequest, Resolution
+from resolute.engine.features import extract_features
+from resolute.engine.policy import prescore
+from resolute.metadata.source import FixtureEvidenceSource
+from resolute.schemas import Confidence, DecisionRequest, Resolution
 
 
 def _score(evidence_source: FixtureEvidenceSource, policy, **request_kwargs):

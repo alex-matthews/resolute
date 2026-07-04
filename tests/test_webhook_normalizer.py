@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from tv_decider.schemas import TriggerSource
-from tv_decider.seerr.webhook import WebhookRejection, normalize_webhook
+from resolute.schemas import TriggerSource
+from resolute.seerr.webhook import WebhookRejection, normalize_webhook
 
 TRIGGERS = ["MEDIA_PENDING", "MEDIA_AUTO_APPROVED"]
 

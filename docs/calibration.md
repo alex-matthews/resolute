@@ -1,6 +1,6 @@
 # Calibration & Feedback Workflow
 
-tv-decider learns through an explicit, reviewable loop — not silent weight
+resolute learns through an explicit, reviewable loop — not silent weight
 drift. The policy file is the model; feedback is the training signal; you are
 the optimizer.
 
@@ -10,9 +10,9 @@ Every decision carries `feedback_options`. Record the household's actual
 preference whenever it differs (or agrees, early on):
 
 ```bash
-tv-decider feedback last agree
-tv-decider feedback last prefer_1080p --reason-tag background_watch
-tv-decider feedback 01KWME0M... prefer_2160p --reason-tag showcase \
+resolute feedback last agree
+resolute feedback last prefer_1080p --reason-tag background_watch
+resolute feedback 01KWME0M... prefer_2160p --reason-tag showcase \
   --comment "looked stunning in the trailer"
 ```
 
@@ -22,8 +22,8 @@ or `POST /api/feedback` from any client. Reason tags are validated against
 ## 2. Review the signal
 
 ```bash
-tv-decider calibrate          # agreement rate, decision mix, override clusters
-tv-decider review-overrides   # every disagreement, newest first
+resolute calibrate          # agreement rate, decision mix, override clusters
+resolute review-overrides   # every disagreement, newest first
 ```
 
 ## 3. Apply the learning to policy.yaml
@@ -45,7 +45,7 @@ Commit the policy change to git — the diff is the calibration record.
 ## 4. Re-verify against golden cases
 
 ```bash
-tv-decider fixtures-test
+resolute fixtures-test
 ```
 
 Golden cases (`fixtures/golden/expectations.json`) encode decisions the
@@ -62,7 +62,7 @@ raw output, and latency. When overrides implicate the judge:
   (`GET /api/decisions/{id}` -> `verdict`, `model_involvement`);
 - adjust `judge/prompts.py`, bump `PROMPT_VERSION`;
 - replay ambiguous fixtures with
-  `tv-decider decide "The Bear" --tmdb-id 136315 --fixtures fixtures/evidence --force-judge`.
+  `resolute decide "The Bear" --tmdb-id 136315 --fixtures fixtures/evidence --force-judge`.
 
 ## Cadence
 

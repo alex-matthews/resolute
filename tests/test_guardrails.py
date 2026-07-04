@@ -1,9 +1,9 @@
 import pytest
 
-from tv_decider.engine.features import FeatureSet
-from tv_decider.engine.guardrails import apply_guardrails
-from tv_decider.engine.policy import PreScore
-from tv_decider.schemas import (
+from resolute.engine.features import FeatureSet
+from resolute.engine.guardrails import apply_guardrails
+from resolute.engine.policy import PreScore
+from resolute.schemas import (
     Confidence,
     ModelVerdict,
     Recommendation,

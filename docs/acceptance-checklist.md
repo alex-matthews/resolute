@@ -1,14 +1,14 @@
 # Acceptance Checklist
 
 From the cleansheet design + handoff. Verification commands assume
-`uv pip install -e '.[dev]'` in a venv.
+`uv sync --locked`.
 
 ## Functional
 
-- [x] Given a Seerr TV request (webhook), tv-decider returns a structured
+- [x] Given a Seerr TV request (webhook), resolute returns a structured
       1080p/2160p decision and action plan — `tests/test_api.py::test_webhook_decides_pending_tv_request`
 - [x] Canonical Seerr webhook payload template + normalizer —
-      `src/tv_decider/seerr/webhook.py`, `tests/test_webhook_normalizer.py`
+      `src/resolute/seerr/webhook.py`, `tests/test_webhook_normalizer.py`
 - [x] Manual decisions (CLI `decide`, API `POST /api/decisions`)
 - [x] Seerr request/profile planning (`plan-seerr`, `POST /api/seerr/plan`)
 - [x] Sonarr audit + fallback planning (`audit-sonarr`, `POST /api/sonarr/audit`,
@@ -35,7 +35,7 @@ From the cleansheet design + handoff. Verification commands assume
       `tests/test_guardrails.py`
 - [x] Low-confidence / held / insufficient-metadata decisions can never execute
 - [x] Race avoidance: decide while pending, profile-before-approve ordering,
-      no tv-decider-initiated Sonarr searches — `docs/adr/0001`
+      no resolute-initiated Sonarr searches — `docs/adr/0001`
 - [x] Pending-status enforcement: the planner emits Seerr writes only for
       pending requests, and the executor/client re-verify status at write time
       — `tests/test_planner.py`, `tests/test_seerr_client.py`, `tests/test_executor.py`
@@ -61,7 +61,7 @@ From the cleansheet design + handoff. Verification commands assume
 
 ## Engineering
 
-- [x] Real package with clear modules (`src/tv_decider/...`), CLI + API over
+- [x] Real package with clear modules (`src/resolute/...`), CLI + API over
       one engine
 - [x] No-network tests: fixtures, provider abstraction, guardrails, planner,
       audit, engine, store, CLI, API, webhook, wire-level Seerr client, golden
@@ -75,12 +75,12 @@ From the cleansheet design + handoff. Verification commands assume
 ## Deploy-time verification (operator to-do)
 
 - [ ] Confirm actual Sonarr profile names and set
-      `TVD_SEERR__PROFILE_NAME_{1080P,2160P}`
+      `RESOLUTE_SEERR__PROFILE_NAME_{1080P,2160P}`
 - [ ] Disable Seerr TV auto-approval for in-scope users (rollout phase 0)
-- [ ] Run `tv-decider preflight` in-cluster: connectivity, profile resolution,
+- [ ] Run `resolute preflight` in-cluster: connectivity, profile resolution,
       pending-request visibility all green
 - [ ] Live contract test with a throwaway pending request before enabling
-      writes: `tv-decider execute` it and verify profile/seasons/root folder
+      writes: `resolute execute` it and verify profile/seasons/root folder
       survive and the request routes (rollout phase 3)
 - [ ] Point the image at a published registry path and pin by digest
 - [ ] Keep one replica / one uvicorn worker (SQLite single-writer)

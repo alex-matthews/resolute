@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: tv-decider
+  name: resolute
 spec:
   accessModes:
     - ReadWriteOnce

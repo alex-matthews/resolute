@@ -35,7 +35,7 @@ scheduled ─────┘        ▼
 | Module | Responsibility |
 | --- | --- |
 | `schemas/` | Pydantic contracts: request, evidence, decision, action plan, feedback, model verdict. Everything is `extra="forbid"`. |
-| `config.py` | Runtime settings (env `TVD_*` / YAML) and the editable household policy file. |
+| `config.py` | Runtime settings (env `RESOLUTE_*` / YAML) and the editable household policy file. |
 | `metadata/source.py` | EvidenceSource protocol: live (Seerr + Sonarr) and fixture implementations. |
 | `engine/features.py` | Evidence -> flat FeatureSet, metadata-gap detection. |
 | `engine/policy.py` | Deterministic weighted pre-score, two lanes, ambiguity band. |
