@@ -73,4 +73,14 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: resolute:ci
           platforms: linux/amd64
+
+      # Run the image the way the cluster will: arbitrary uid 1032:100,
+      # read-only rootfs, no HOME, only /data writable, policy mounted ro.
+      - name: Kubernetes-constraint smoke
+        env:
+          IMAGE: resolute:ci
+          IMAGE_PREBUILT: "1"
+        run: bash scripts/k8s-smoke.sh

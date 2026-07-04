@@ -36,7 +36,7 @@ def build_runtime(config_file: str | None = None) -> Runtime:
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    policy = load_policy(settings.policy_path)
+    policy = load_policy(settings.policy_path, required=True)
 
     seerr = SeerrClient(settings.seerr.url, settings.seerr.api_key)
     sonarr = (

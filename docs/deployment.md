@@ -23,6 +23,53 @@ Components:
 - **PVC** `resolute` (1Gi ceph-block): SQLite decision/feedback history,
   volsync-backed like other apps.
 
+## Container identity (cluster standard)
+
+The image is identity-agnostic (home-operations/containers precedent,
+e.g. `apps/tautulli`): it creates no user, chowns nothing, ships no
+policy file, and defaults to `nobody:nogroup` for bare runs. Storage
+identity comes exclusively from the manifests — the cluster standard for
+stateful apps, already present in `deploy/kubernetes/app/helmrelease.yaml`:
+
+```yaml
+defaultPodOptions:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1032
+    runAsGroup: 100
+    fsGroup: 100
+    fsGroupChangePolicy: OnRootMismatch
+# per-container:
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities: { drop: ["ALL"] }
+```
+
+`1032` matches the volsync restic movers (`${VOLSYNC_PUID:=1032}`); data
+written as any other uid without `fsGroup` breaks backup/restore.
+`scripts/k8s-smoke.sh` (CI + `mise run k8s-smoke`) verifies the image
+under exactly these constraints: `--user 1032:100 --read-only`, no HOME,
+only /data writable, policy mounted read-only. The serve path fails fast
+if `/config/policy.yaml` is not mounted.
+
+## SQLite on volsync (backup/restore posture)
+
+- **copyMethod `Snapshot`** (volsync component default): restic reads a
+  CSI snapshot, so backups are crash-consistent point-in-time images —
+  the power-cut scenario SQLite WAL mode is designed to survive.
+- **WAL expectations:** a snapshot may include `resolute.db` plus
+  `-wal`/`-shm` sidecars; SQLite replays the WAL on first open. Never
+  copy the `.db` without its `-wal`. No quiesce needed at this write
+  volume.
+- **Restore drill (run once before calling the deployment done):**
+  1. Scratch PVC + ReplicationDestination in a throwaway namespace
+     against the resolute restic repository.
+  2. Debug pod as `1032:100` mounting it.
+  3. `sqlite3 /data/resolute.db "PRAGMA integrity_check;"` → `ok`;
+     `SELECT COUNT(*), MAX(created_at) FROM decisions;` for recency.
+  4. Confirm ownership/permissions let uid 1032 open the DB read-write.
+
 ## Direct webhook (default shape)
 
 ```text

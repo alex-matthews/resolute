@@ -193,9 +193,24 @@ def load_settings(config_file: str | os.PathLike[str] | None = None) -> Settings
     return Settings(**file_values)
 
 
-def load_policy(path: str | os.PathLike[str]) -> Policy:
+def load_policy(path: str | os.PathLike[str], required: bool = False) -> Policy:
+    """Load the household policy file.
+
+    `required=True` is the production serve path: the image deliberately
+    ships no policy file, so a missing file there means the ConfigMap
+    mount is broken and the service must fail fast instead of silently
+    scoring with defaults. Ad-hoc CLI/fixture runs keep the tolerant
+    default-policy behavior.
+    """
     p = Path(path)
     if not p.is_file():
+        if required:
+            raise FileNotFoundError(
+                f"policy file not found at {p}: mount the resolute-policy "
+                "ConfigMap at /config/policy.yaml (or set "
+                "RESOLUTE_POLICY_PATH). The image deliberately ships no "
+                "policy file."
+            )
         return Policy()
     data = yaml.safe_load(p.read_text()) or {}
     return Policy(**data)

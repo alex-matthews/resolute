@@ -56,6 +56,10 @@ helm template resolute oci://ghcr.io/bjw-s-labs/helm/app-template --version "${V
 description = "Validate rendered manifests and Flux/CRD resources with kubeconform"
 run = "bash scripts/kubeconform.sh"
 
+[tasks.k8s-smoke]
+description = "Run the built image under Kubernetes-like constraints (uid 1032:100, read-only rootfs, only /data writable, no HOME)"
+run = "bash scripts/k8s-smoke.sh"
+
 [tasks.build]
 description = "Build the container image locally"
 run = "docker build -t resolute:local ."
