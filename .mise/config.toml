@@ -5,6 +5,7 @@ helm = "4.2.2"
 kubeconform = "0.7.0"
 hadolint = "2.14.0"
 actionlint = "1.7.10"
+shellcheck = "0.11.0"
 zizmor = "1.26.1"
 yq = "4.53.3"
 
@@ -32,6 +33,10 @@ run = "RESOLUTE_DB_PATH=$(mktemp -d)/golden.db uv run resolute fixtures-test"
 description = "Lint the Dockerfile"
 run = "hadolint Dockerfile"
 
+[tasks.shell-lint]
+description = "Run ShellCheck over repo shell scripts"
+run = "shellcheck scripts/*.sh"
+
 [tasks.workflow-lint]
 description = "Lint and security-check GitHub workflows"
 run = """
@@ -57,4 +62,4 @@ run = "docker build -t resolute:local ."
 
 [tasks.ci]
 description = "Core CI checks, locally (excludes the container build: run `mise run build` separately, it needs a Docker daemon)"
-depends = ["lint", "test", "golden", "dockerfile-lint", "workflow-lint", "kubeconform"]
+depends = ["lint", "test", "golden", "dockerfile-lint", "shell-lint", "workflow-lint", "kubeconform"]
