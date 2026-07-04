@@ -26,6 +26,8 @@ jobs:
         with:
           client-id: "${{ secrets.BOT_APP_CLIENT_ID }}"
           private-key: "${{ secrets.BOT_APP_PRIVATE_KEY }}"
+          # contents: write is needed by delete-branch: true below
+          permission-contents: write
           permission-issues: write
           permission-pull-requests: write
 
