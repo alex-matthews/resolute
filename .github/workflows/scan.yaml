@@ -9,6 +9,11 @@ name: Scan
 # instead — Renovate bumps the digest-pinned base image and the uv lockfile as
 # fixes land. Revisit (flip exit-code to 1 for fixable high/critical) after the
 # shadow deployment settles.
+#
+# Personal-account note: SARIF upload requires GitHub code scanning, which is
+# free on public repos but unavailable on private personal repos (GHAS is
+# org/enterprise-only). If this repo goes private, swap the upload steps for
+# `format: table` + `exit-code: "0"` console output.
 
 on:
   pull_request:

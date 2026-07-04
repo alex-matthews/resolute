@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from .. import __version__
 from ..config import Policy, Settings
 from ..engine.engine import DecisionEngine
 from ..executor import ExecutionBlocked, ExecutionFailed, Executor
@@ -52,7 +53,7 @@ def create_app(
     executor: Executor | None = None,
     seerr: SeerrClient | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="resolute", version="0.1.0")
+    app = FastAPI(title="resolute", version=__version__)
     metrics: Counter[str] = Counter()
 
     if settings.api_token:

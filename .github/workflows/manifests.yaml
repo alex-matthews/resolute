@@ -8,13 +8,17 @@ on:
       - main
     paths:
       - deploy/**
+      - scripts/kubeconform.sh
       - .mise/config.toml
+      - .github/workflows/manifests.yaml
   pull_request:
     branches:
       - main
     paths:
       - deploy/**
+      - scripts/kubeconform.sh
       - .mise/config.toml
+      - .github/workflows/manifests.yaml
   workflow_dispatch:
 
 concurrency:

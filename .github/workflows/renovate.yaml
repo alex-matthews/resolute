@@ -1,5 +1,11 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+# Setup dependency (home-operations pattern, works on a personal account):
+# requires BOT_CLIENT_ID / BOT_APP_PRIVATE_KEY secrets for a GitHub App you
+# own, plus a `.github` repo under the same account running a dispatchable
+# self-hosted Renovate workflow (renovate.yaml with an autodiscoverFilter
+# input). If you install the Mend-hosted Renovate App on this repo instead,
+# delete this workflow — .renovaterc.json5 is picked up automatically.
 name: Renovate
 
 on:
