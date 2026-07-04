@@ -62,7 +62,12 @@ jobs:
           renovate-version: ${{ env.RENOVATE_VERSION }}
         env:
           LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
+          # mise lockfile refresh: Renovate must run `mise lock`, which it
+          # gates as an unsafe execution, and mise itself must trust the
+          # checked-out config (same pair the home-operations runner sets).
+          RENOVATE_ALLOWED_UNSAFE_EXECUTIONS: '["mise"]'
           RENOVATE_AUTODISCOVER: "false"
+          RENOVATE_CUSTOM_ENV_VARIABLES: '{"MISE_TRUSTED_CONFIG_PATHS":"/tmp/renovate/repos"}'
           RENOVATE_DRY_RUN: ${{ inputs.dryRun == 'true' && 'full' || null }}
           RENOVATE_ONBOARDING: "false"
           RENOVATE_PLATFORM: github
