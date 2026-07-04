@@ -99,23 +99,46 @@ def test_webhook_shared_secret(settings, policy, evidence_source, store, webhook
     assert ok.status_code == 200
 
 
-def test_webhook_auto_profile_executes(policy, evidence_source, store, webhook_payload, tmp_path):
+def _auto_settings(tmp_path, mode, **kwargs):
     from tv_decider.config import Settings
 
-    settings = Settings(
-        mode=AutomationMode.AUTO_PROFILE,
+    return Settings(
+        mode=mode,
         allow_writes=True,
         db_path=tmp_path / "auto.db",
         policy_path=tmp_path / "missing.yaml",
+        seerr={"webhook_shared_secret": "hook-secret"},
+        **kwargs,
     )
+
+
+def test_webhook_auto_profile_executes(policy, evidence_source, store, webhook_payload, tmp_path):
+    settings = _auto_settings(tmp_path, AutomationMode.AUTO_PROFILE)
     engine = DecisionEngine(settings, policy, evidence_source)
     executor = Executor(settings, seerr=FakeSeerr(), sonarr=FakeSonarr())
     client = TestClient(create_app(settings, policy, engine, store, executor))
 
-    body = client.post("/api/webhooks/seerr", json=webhook_payload).json()
+    body = client.post(
+        "/api/webhooks/seerr",
+        json=webhook_payload,
+        headers={"X-TVD-Token": "hook-secret"},
+    ).json()
     assert body["executed_actions"] == ["set_seerr_request_profile_2160p"]
     assert executor.seerr.profile_updates == [(123, 5, [1])]
     assert executor.seerr.approvals == []  # auto_profile never approves
+
+
+def test_auto_write_mode_cannot_be_configured_without_webhook_secret(tmp_path):
+    from pydantic import ValidationError
+
+    from tv_decider.config import Settings
+
+    with pytest.raises(ValidationError, match="webhook_shared_secret"):
+        Settings(
+            mode=AutomationMode.AUTO_PROFILE,
+            allow_writes=True,
+            db_path=tmp_path / "x.db",
+        )
 
 
 def test_feedback_flow(api):
@@ -301,22 +324,41 @@ def test_partial_execution_is_recorded_durably(
 
 
 def test_webhook_auto_execution_records_partial_and_reports_error(
-    settings, policy, evidence_source, store, webhook_payload
+    policy, evidence_source, store, webhook_payload, tmp_path
 ):
     from test_executor import FailingApproveSeerr
 
-    settings.mode = AutomationMode.AUTO_APPROVE
-    settings.allow_writes = True
-    settings.auto_approve_enabled = True
+    settings = _auto_settings(
+        tmp_path, AutomationMode.AUTO_APPROVE, auto_approve_enabled=True
+    )
     engine = DecisionEngine(settings, policy, evidence_source)
     executor = Executor(settings, seerr=FailingApproveSeerr(), sonarr=FakeSonarr())
     client = TestClient(create_app(settings, policy, engine, store, executor))
 
-    body = client.post("/api/webhooks/seerr", json=webhook_payload).json()
+    body = client.post(
+        "/api/webhooks/seerr",
+        json=webhook_payload,
+        headers={"X-TVD-Token": "hook-secret"},
+    ).json()
     assert body["executed_actions"] == ["set_seerr_request_profile_2160p"]
     assert "seerr exploded" in body["execution_error"]
     executions = store.executions(body["decision_id"])
     assert executions[0]["operator"] == "auto (partial)"
+
+
+def test_execute_endpoint_409_when_nothing_executable(api):
+    """Shadow decision + valid token: no writes are permitted, no audit row written."""
+    client, _, _ = api
+    decision_id = client.post(
+        "/api/decisions", json={"title": "Severance", "tmdb_id": 95396}
+    ).json()["decision_id"]
+    response = client.post(
+        f"/api/decisions/{decision_id}/execute",
+        json={"operator": "alex"},
+        headers={"X-TVD-Operator-Token": OPERATOR_TOKEN},
+    )
+    assert response.status_code == 409
+    assert "nothing executable" in response.json()["detail"]
 
 
 def test_sonarr_audit_endpoint(api):

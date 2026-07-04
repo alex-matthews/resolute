@@ -72,7 +72,11 @@ def _executor(mode, *, allow_writes, auto_approve_enabled=False, seerr=None):
     from tv_decider.config import Settings
 
     s = Settings(
-        mode=mode, allow_writes=allow_writes, auto_approve_enabled=auto_approve_enabled
+        mode=mode,
+        allow_writes=allow_writes,
+        auto_approve_enabled=auto_approve_enabled,
+        # auto write modes refuse to boot without an authenticated webhook
+        seerr={"webhook_shared_secret": "hook-secret"},
     )
     return Executor(s, seerr=seerr or FakeSeerr(), sonarr=FakeSonarr()), s
 

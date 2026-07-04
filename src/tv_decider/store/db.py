@@ -101,6 +101,13 @@ class Store:
         with self._lock:
             self._conn.close()
 
+    def ping(self) -> bool:
+        """Cheap readiness probe: proves the DB is reachable without
+        deserializing stored payloads (which could fail after schema changes)."""
+        with self._lock:
+            self._conn.execute("SELECT COUNT(*) FROM decisions").fetchone()
+        return True
+
     # -- decisions ---------------------------------------------------------
 
     def save_decision(self, decision: Decision) -> None:

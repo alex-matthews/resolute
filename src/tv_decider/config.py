@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .schemas.core import AutomationMode
@@ -165,6 +165,23 @@ class Settings(BaseSettings):
     seerr: SeerrSettings = Field(default_factory=SeerrSettings)
     sonarr: SonarrSettings = Field(default_factory=SonarrSettings)
     judge: JudgeSettings = Field(default_factory=JudgeSettings)
+
+    @model_validator(mode="after")
+    def _auto_writes_require_webhook_secret(self) -> "Settings":
+        """Auto modes execute writes from the webhook path, so an unauthenticated
+        webhook plus auto writes would be an open write-capable endpoint.
+        Refuse the combination outright rather than trusting deployment topology."""
+        if (
+            self.allow_writes
+            and self.mode in (AutomationMode.AUTO_PROFILE, AutomationMode.AUTO_APPROVE)
+            and not self.seerr.webhook_shared_secret
+        ):
+            raise ValueError(
+                f"mode={self.mode} with allow_writes=true requires "
+                "seerr.webhook_shared_secret: refusing to run an unauthenticated "
+                "write-capable webhook endpoint"
+            )
+        return self
 
 
 def load_settings(config_file: str | os.PathLike[str] | None = None) -> Settings:

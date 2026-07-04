@@ -101,7 +101,9 @@ the fact.
 | `auto_approve` | automatic | also approves; requires `auto_approve_enabled: true` |
 
 All writes additionally require the `allow_writes: true` master switch, and
-held/low-confidence decisions never execute regardless of mode. Follow
+held/low-confidence decisions never execute regardless of mode. The auto
+modes also refuse to start unless the webhook shared secret is configured
+(no unauthenticated write-capable endpoint). Follow
 [docs/rollout.md](docs/rollout.md) — shadow first, always.
 
 ## How decisions work
@@ -127,7 +129,7 @@ held/low-confidence decisions never execute regardless of mode. Follow
 
 ```text
 src/tv_decider/     engine, schemas, seerr/sonarr adapters, judge, store, api, cli
-tests/              104 no-network tests
+tests/              113 no-network tests
 fixtures/           seerr/sonarr payloads, evidence bundles, golden expectations
 config/             config + household policy examples
 deploy/kubernetes/  Flux/app-template manifests (home-ops style)

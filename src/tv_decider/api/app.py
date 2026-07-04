@@ -80,7 +80,7 @@ def create_app(
 
     @app.get("/readyz")
     def readyz() -> dict:
-        store.list_decisions(limit=1)  # proves the DB is reachable
+        store.ping()
         return {"status": "ready", "mode": settings.mode}
 
     @app.get("/metrics")
@@ -135,6 +135,12 @@ def create_app(
             raise HTTPException(
                 502, f"execution failed after {partial or 'no actions'}: {exc}"
             ) from exc
+        if not executed:
+            raise HTTPException(
+                409,
+                f"nothing executable: decision mode '{decision.mode}' and the write"
+                " gates permit no actions",
+            )
         store.mark_executed(decision_id, [a.value for a in executed], operator=body.operator)
         metrics["executions_total"] += 1
         return {"decision_id": decision_id, "executed_actions": executed}

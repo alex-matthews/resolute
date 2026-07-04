@@ -131,11 +131,13 @@ avoid guessing them.)
 
 SQLite is serialized in-process only. Keep exactly **one replica** and **one
 uvicorn worker** (`tv-decider serve` runs one worker; the HelmRelease pins
-`replicas: 1` with `strategy: Recreate`). Do not run ad hoc CLI commands that
-write (`decide`, `feedback`, `execute`) against the mounted PVC while the API
-pod is serving — use the HTTP API, or `kubectl exec` into the running pod so
-both writers share the same process. If this service ever genuinely needs
-concurrency, that is the Postgres trigger mentioned in the design docs.
+`replicas: 1` with `strategy: Recreate`). Prefer the HTTP API for anything
+that writes (`decide`, `feedback`, execution). `kubectl exec` CLI use is a
+second Python process with its own SQLite connection against the same
+pod/PVC — outside the in-process lock, but WAL makes it acceptable for
+break-glass use at this volume. Never write from a *different* pod or node.
+If this service ever genuinely needs concurrency, that is the Postgres
+trigger mentioned in the design docs.
 
 ## Observability
 

@@ -61,9 +61,12 @@ profiles at the Sonarr end.
 
 ## Phase 4 — auto_profile
 
-- Set `mode: auto_profile`. Pending requests get their profile set
-  automatically when guardrails pass (never low-confidence, never held).
-  Approval remains human, in Seerr, where it always was.
+- Set `mode: auto_profile`. Requires `seerr.webhook_shared_secret` — the
+  service refuses to start in an auto write mode with an unauthenticated
+  webhook, since that path executes writes.
+- Pending requests get their profile set automatically when guardrails pass
+  (never low-confidence, never held). Approval remains human, in Seerr,
+  where it always was.
 
 ## Phase 5 — auto_approve (optional, opt-in)
 

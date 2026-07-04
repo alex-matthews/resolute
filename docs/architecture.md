@@ -72,6 +72,13 @@ its output is:
 A judge failure (network, bad JSON twice) falls back to the deterministic
 result with a `model_error` risk flag; ambiguous cases then hold for a human.
 
+Note that the evidence bundle contains **untrusted text** (TMDB overviews and
+keywords are publicly editable), and it is interpolated into the judge
+prompt. The clamps above are what bound a prompt-injection attempt: the worst
+a malicious show description can achieve is flipping an ambiguous-band
+decision between two profiles you already trust, or forcing a manual-review
+hold — never a write the deterministic layer wouldn't allow.
+
 ## Write safety
 
 Three independent gates must all open before any write:

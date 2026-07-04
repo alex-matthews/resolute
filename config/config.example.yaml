@@ -40,6 +40,8 @@ seerr:
   # produce audit/fallback plans, never Seerr writes (enforced by the planner).
   trigger_notification_types: ["MEDIA_PENDING", "MEDIA_AUTO_APPROVED"]
   # If set, the Seerr webhook must send this value in the X-TVD-Token header.
+  # Mandatory for auto_profile/auto_approve with allow_writes: the service
+  # refuses to start an unauthenticated write-capable webhook.
   webhook_shared_secret: ""
 
 sonarr:

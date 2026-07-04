@@ -26,6 +26,8 @@ From the cleansheet design + handoff. Verification commands assume
 - [x] Default mode `shadow`; writes require `approve` / `auto_profile` /
       `auto_approve`; `auto_approve` disabled by default and double-gated —
       `tests/test_executor.py`
+- [x] Auto write modes refuse to start without `seerr.webhook_shared_secret`
+      (no unauthenticated write-capable webhook) — `tests/test_config.py`
 - [x] `allow_writes` master switch independently blocks all writes
 - [x] Model output strictly schema-validated; invalid output fails closed —
       `tests/test_judge.py`
@@ -63,7 +65,7 @@ From the cleansheet design + handoff. Verification commands assume
       one engine
 - [x] No-network tests: fixtures, provider abstraction, guardrails, planner,
       audit, engine, store, CLI, API, webhook, wire-level Seerr client, golden
-      cases — `pytest` (104 tests)
+      cases — `pytest` (113 tests)
 - [x] Durable decision/feedback/audit history: SQLite on PVC + JSONL export
 - [x] Dockerfile, local run commands, config examples
       (`config/*.example.yaml`), home-ops manifests (`deploy/kubernetes/`)
