@@ -56,5 +56,5 @@ description = "Build the container image locally"
 run = "docker build -t resolute:local ."
 
 [tasks.ci]
-description = "Everything CI runs, locally"
+description = "Core CI checks, locally (excludes the container build: run `mise run build` separately, it needs a Docker daemon)"
 depends = ["lint", "test", "golden", "dockerfile-lint", "workflow-lint", "kubeconform"]

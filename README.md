@@ -150,8 +150,8 @@ mise run test         # pytest
 mise run lint         # ruff
 mise run golden       # golden decision fixtures
 mise run kubeconform  # render app-template + validate all manifests
-mise run build        # docker build
-mise run ci           # everything CI runs, locally
+mise run build        # docker build (needs a Docker daemon)
+mise run ci           # core CI checks (everything except the container build)
 ```
 
 Runtime is Python 3.14 on a digest-pinned `python:3.14-slim` base; Renovate
