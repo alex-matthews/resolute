@@ -86,6 +86,57 @@ docker run -p 8130:8130 \
   tv-decider
 ```
 
+## API authentication and network posture
+
+Three independent credentials, all optional-but-recommended layers:
+
+- `seerr.webhook_shared_secret` — gates `/api/webhooks/seerr` (`X-TVD-Token`).
+- `execute_token` — gates `POST /api/decisions/{id}/execute`
+  (`X-TVD-Operator-Token`); while unset, HTTP execution is disabled entirely
+  and `tv-decider execute` (CLI, via `kubectl exec`) is the only write path.
+- `api_token` — gates every other `/api/*` endpoint (`X-TVD-Api-Token`).
+  Health/readiness/metrics stay open for probes and scrapers. Set this once
+  the judge is enabled: decision endpoints can trigger paid model calls, and
+  "internal-only ClusterIP" is a topology, not an authorization model.
+
+For defense in depth, add a NetworkPolicy restricting ingress to Seerr, the
+review CronJob, and your operator tooling, e.g.:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tv-decider
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tv-decider
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seerr
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: tv-decider   # review cronjob
+      ports:
+        - port: 8130
+```
+
+(Adjust labels/CNI specifics to your cluster; not shipped as a manifest to
+avoid guessing them.)
+
+## Single-writer constraint
+
+SQLite is serialized in-process only. Keep exactly **one replica** and **one
+uvicorn worker** (`tv-decider serve` runs one worker; the HelmRelease pins
+`replicas: 1` with `strategy: Recreate`). Do not run ad hoc CLI commands that
+write (`decide`, `feedback`, `execute`) against the mounted PVC while the API
+pod is serving — use the HTTP API, or `kubectl exec` into the running pod so
+both writers share the same process. If this service ever genuinely needs
+concurrency, that is the Postgres trigger mentioned in the design docs.
+
 ## Observability
 
 - `/healthz` (liveness), `/readyz` (readiness, proves DB access), `/metrics`

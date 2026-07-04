@@ -86,8 +86,14 @@ Three independent gates must all open before any write:
 
 SQLite on a PVC (WAL mode). Tables: `decisions` (full Decision JSON plus
 indexed columns), `feedback`, `audits`, `webhook_events` (raw payload +
-outcome, which doubles as a fixture farm), `executions`. `export-jsonl`
-provides append-only export. Redis/Dragonfly is intentionally absent from v1:
+outcome, which doubles as a fixture farm), `executions` (including partial
+executions recorded before a mid-plan failure surfaces). `export-jsonl`
+provides append-only export.
+
+Access is serialized with an in-process lock, which makes the service a
+**strict single-writer**: one replica, one uvicorn worker, no concurrent CLI
+writers against the same file (see docs/deployment.md). Scaling beyond that
+is the explicit trigger for the Postgres migration path. Redis/Dragonfly is intentionally absent from v1:
 decision volume is a few per day, so a cache layer is not yet earning its
 operational cost; idempotency is handled by the fact that re-deciding a
 pending request is harmless and re-approving is a no-op.

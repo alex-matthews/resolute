@@ -162,6 +162,17 @@ class Store:
             )
             self._conn.commit()
 
+    def executions(self, decision_id: str) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT executed_at, actions, operator FROM executions"
+                " WHERE decision_id=? ORDER BY executed_at",
+                (decision_id,),
+            ).fetchall()
+        return [
+            {"executed_at": r[0], "actions": json.loads(r[1]), "operator": r[2]} for r in rows
+        ]
+
     # -- feedback ----------------------------------------------------------
 
     def save_feedback(self, feedback: FeedbackIn) -> FeedbackRecord:

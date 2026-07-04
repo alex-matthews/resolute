@@ -150,6 +150,10 @@ class Settings(BaseSettings):
     # Required for POST /api/decisions/{id}/execute (X-TVD-Operator-Token header).
     # While unset, HTTP-mediated execution is disabled entirely; the CLI still works.
     execute_token: str = ""
+    # Optional bearer for all other /api/* endpoints (X-TVD-Api-Token header).
+    # The webhook keeps its own shared secret; health/ready/metrics stay open.
+    # Recommended once the judge is enabled: decision endpoints can spend money.
+    api_token: str = ""
 
     db_path: Path = Path("data/tv-decider.db")
     policy_path: Path = Path("config/policy.yaml")

@@ -12,6 +12,10 @@ spec:
   values:
     controllers:
       tv-decider:
+        # SQLite single-writer: keep exactly 1 replica and 1 uvicorn worker
+        # (the default `tv-decider serve` runs one worker). Do not scale this.
+        replicas: 1
+        strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "true"
         containers:
@@ -81,13 +85,20 @@ spec:
               - python
               - -c
               - |
-                import httpx
+                import os, httpx
+                headers = {}
+                if os.environ.get("TVD_API_TOKEN"):
+                    headers["X-TVD-Api-Token"] = os.environ["TVD_API_TOKEN"]
                 r = httpx.post(
                     "http://tv-decider.default.svc.cluster.local:8130/api/reviews/pending",
+                    headers=headers,
                     timeout=300,
                 )
                 r.raise_for_status()
                 print(r.text)
+            envFrom:
+              - secretRef:
+                  name: tv-decider-secret
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true

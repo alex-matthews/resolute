@@ -11,6 +11,9 @@ Writes are earned, not assumed. Each phase has an explicit exit criterion.
 - Disable Seerr auto-approval for TV requests (or for the users in scope), so
   requests land pending. Without this, tv-decider can only audit after the
   fact.
+- Run `tv-decider preflight`: verifies Seerr connectivity, resolves both
+  profile names to IDs, confirms pending TV requests are visible, and lists
+  Sonarr profiles. All checks must pass before moving on.
 
 ## Phase 1 — shadow (no writes, weeks 1–2)
 
@@ -36,9 +39,18 @@ edit `policy.yaml` weights/pins and keep shadowing).
 
 - Set `mode: approve`, `allow_writes: true`, and a strong `execute_token`
   (HTTP execution stays disabled until the token exists).
+- **Live contract test first**: with a throwaway pending TV request, run
+  `tv-decider execute <decision-id> --operator alex` and verify in Seerr that
+  the profile changed, seasons/root folder/server survived intact, and the
+  request approved and routed. This is the one check fixtures cannot give you.
 - Nothing changes automatically. When a decision looks right, execute it
-  explicitly: `POST /api/decisions/{id}/execute {"operator": "alex"}` with the
+  explicitly via `tv-decider execute` (CLI/kubectl) or
+  `POST /api/decisions/{id}/execute {"operator": "alex"}` with the
   `X-TVD-Operator-Token` header.
+- If an execution fails partway (profile set but approval failed), the
+  completed actions are still recorded in the `executions` table with a
+  `(partial)` operator suffix — check `audit-sonarr` and re-execute or finish
+  by hand in Seerr.
 - The executor sets the request profile, then approves — while the request is
   still pending, so no Sonarr race exists.
 - After a few requests, run `tv-decider audit-sonarr --decision-id ...` to

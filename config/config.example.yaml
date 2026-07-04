@@ -13,8 +13,13 @@ allow_writes: false
 auto_approve_enabled: false
 
 # Required for POST /api/decisions/{id}/execute (sent as X-TVD-Operator-Token).
-# While empty, HTTP-mediated execution is disabled; the CLI path still works.
+# While empty, HTTP-mediated execution is disabled; `tv-decider execute` still works.
 execute_token: ""
+
+# Optional bearer for all other /api/* endpoints (sent as X-TVD-Api-Token).
+# The webhook keeps its own shared secret; health/ready/metrics stay open.
+# Recommended once the judge is enabled, since decision endpoints can spend money.
+api_token: ""
 
 db_path: data/tv-decider.db
 policy_path: config/policy.yaml

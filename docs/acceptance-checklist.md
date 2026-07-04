@@ -40,7 +40,13 @@ From the cleansheet design + handoff. Verification commands assume
 - [x] Preserving `PUT /request/{id}` body: routing fields and seasons echoed
       back, only `profileId` changed, no explicit nulls — `tests/test_seerr_client.py`
 - [x] Webhook shared-secret support; execute endpoint requires a configured
-      operator token (`execute_token`) and is disabled without one
+      operator token (`execute_token`) and is disabled without one; optional
+      `api_token` gates all other decision-producing endpoints
+- [x] Partial executions are durably recorded before mid-plan failures surface
+      (`ExecutionFailed.executed` → executions table with `(partial)` marker)
+      — `tests/test_executor.py`, `tests/test_api.py`
+- [x] CLI `execute` command provides the non-HTTP write path; CLI `preflight`
+      verifies the live Seerr contract before write modes are enabled
 
 ## Scope boundaries
 
@@ -57,7 +63,7 @@ From the cleansheet design + handoff. Verification commands assume
       one engine
 - [x] No-network tests: fixtures, provider abstraction, guardrails, planner,
       audit, engine, store, CLI, API, webhook, wire-level Seerr client, golden
-      cases — `pytest` (96 tests)
+      cases — `pytest` (104 tests)
 - [x] Durable decision/feedback/audit history: SQLite on PVC + JSONL export
 - [x] Dockerfile, local run commands, config examples
       (`config/*.example.yaml`), home-ops manifests (`deploy/kubernetes/`)
@@ -69,6 +75,10 @@ From the cleansheet design + handoff. Verification commands assume
 - [ ] Confirm actual Sonarr profile names and set
       `TVD_SEERR__PROFILE_NAME_{1080P,2160P}`
 - [ ] Disable Seerr TV auto-approval for in-scope users (rollout phase 0)
-- [ ] Verify `PUT /api/v1/request/{id}` accepts `profileId` on the deployed
-      Seerr version with a real pending request (rollout phase 3 first write)
+- [ ] Run `tv-decider preflight` in-cluster: connectivity, profile resolution,
+      pending-request visibility all green
+- [ ] Live contract test with a throwaway pending request before enabling
+      writes: `tv-decider execute` it and verify profile/seasons/root folder
+      survive and the request routes (rollout phase 3)
 - [ ] Point the image at a published registry path and pin by digest
+- [ ] Keep one replica / one uvicorn worker (SQLite single-writer)

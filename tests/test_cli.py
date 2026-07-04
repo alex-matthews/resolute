@@ -116,6 +116,23 @@ def test_fixtures_test_golden_suite(env, fixtures_dir):
     assert "FAIL" not in result.output
 
 
+def test_execute_command_exists_and_is_mode_gated(env, fixtures_dir):
+    assert _decide(env, fixtures_dir).exit_code == 0
+    # shadow decision with no write actions: executes nothing, exits cleanly
+    result = runner.invoke(
+        app, ["execute", "last", "--operator", "alex", "--yes"], env=env
+    )
+    assert result.exit_code == 0, result.output
+    assert "nothing executed" in result.output
+
+
+def test_execute_command_unknown_decision(env):
+    result = runner.invoke(
+        app, ["execute", "NOPE", "--operator", "alex", "--yes"], env=env
+    )
+    assert result.exit_code == 1
+
+
 def test_export_jsonl(env, fixtures_dir, tmp_path):
     assert _decide(env, fixtures_dir).exit_code == 0
     out = tmp_path / "decisions.jsonl"

@@ -1,8 +1,8 @@
 import pytest
 
-from tv_decider.executor import ExecutionBlocked, Executor
+from tv_decider.executor import ExecutionBlocked, ExecutionFailed, Executor
 from tv_decider.schemas import ActionType, AutomationMode, DecisionRequest
-from tv_decider.seerr.client import RequestNotPendingError
+from tv_decider.seerr.client import RequestNotPendingError, SeerrError
 
 
 class FakeSeerr:
@@ -131,6 +131,44 @@ def test_auto_approve_requires_explicit_opt_in(seerr_decision):
     executed = executor.execute(seerr_decision(AutomationMode.AUTO_APPROVE))
     assert ActionType.APPROVE_SEERR_REQUEST in executed
     assert executor.seerr.approvals == [123]
+
+
+class FailingApproveSeerr(FakeSeerr):
+    def approve_request(self, request_id):
+        raise SeerrError("seerr exploded during approval")
+
+
+class ApprovalRaceSeerr(FakeSeerr):
+    """A human approves in Seerr right after our profile update lands."""
+
+    def update_request_profile(self, request_id, profile_id, seasons=None):
+        result = super().update_request_profile(request_id, profile_id, seasons)
+        self.status = 2
+        return result
+
+
+def test_mid_plan_failure_reports_partial_execution(seerr_decision):
+    executor, _ = _executor(
+        AutomationMode.APPROVE, allow_writes=True, seerr=FailingApproveSeerr()
+    )
+    decision = seerr_decision(AutomationMode.APPROVE)
+    with pytest.raises(ExecutionFailed) as info:
+        executor.execute(decision, operator_approved=True)
+    # the profile update ran and is reported so callers can record it durably
+    assert info.value.executed == [ActionType.SET_SEERR_REQUEST_PROFILE_2160P]
+    assert executor.seerr.profile_updates == [(123, 5, [1])]
+    assert executor.seerr.approvals == []
+
+
+def test_approval_race_after_profile_update_reports_partial(seerr_decision):
+    executor, _ = _executor(
+        AutomationMode.APPROVE, allow_writes=True, seerr=ApprovalRaceSeerr()
+    )
+    decision = seerr_decision(AutomationMode.APPROVE)
+    with pytest.raises(ExecutionFailed) as info:
+        executor.execute(decision, operator_approved=True)
+    assert info.value.executed == [ActionType.SET_SEERR_REQUEST_PROFILE_2160P]
+    assert executor.seerr.approvals == []
 
 
 def test_request_no_longer_pending_is_blocked(seerr_decision):

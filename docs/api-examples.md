@@ -2,6 +2,10 @@
 
 Base URL in-cluster: `http://tv-decider.default.svc.cluster.local:8130`
 
+If `api_token` is configured, every `/api/*` call below (except the webhook,
+which uses its own shared secret) additionally needs
+`-H 'X-TVD-Api-Token: <api_token>'`.
+
 ## Manual decision
 
 ```bash
@@ -94,6 +98,16 @@ curl -s -X POST localhost:8130/api/decisions/01KWME0M3H8Y1RZ0Q2W7C9XKPT/execute 
 #     ["set_seerr_request_profile_2160p", "approve_seerr_request"]}
 # 403 on missing/invalid token; 409 if the decision is held, low-confidence,
 # no longer pending in Seerr, or mode/allow_writes forbids it.
+# 502 if a write fails mid-plan; actions that already ran are recorded in the
+# executions table with operator "alex (partial)" before the error surfaces.
+```
+
+The same execution is available from the CLI (e.g. via `kubectl exec` into
+the pod), which shares the write gates and partial-recording behavior:
+
+```bash
+tv-decider execute 01KWME0M3H8Y1RZ0Q2W7C9XKPT --operator alex
+tv-decider execute last --operator alex --yes   # skip confirmation
 ```
 
 ## Scheduled review sweep

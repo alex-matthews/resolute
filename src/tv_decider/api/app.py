@@ -7,11 +7,12 @@ from collections import Counter
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ..config import Policy, Settings
 from ..engine.engine import DecisionEngine
-from ..executor import ExecutionBlocked, Executor
+from ..executor import ExecutionBlocked, ExecutionFailed, Executor
 from ..schemas import AutomationMode, Decision, DecisionRequest, FeedbackIn, Resolution
 from ..seerr.client import SeerrClient, SeerrError
 from ..seerr.webhook import WebhookRejection, normalize_webhook
@@ -53,6 +54,17 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="tv-decider", version="0.1.0")
     metrics: Counter[str] = Counter()
+
+    if settings.api_token:
+        # Gate everything under /api/ except the webhook, which carries its own
+        # shared secret. Health/readiness/metrics stay open for probes/scrapers.
+        @app.middleware("http")
+        async def require_api_token(request: Request, call_next):
+            path = request.url.path
+            if path.startswith("/api/") and path != "/api/webhooks/seerr":
+                if request.headers.get("X-TVD-Api-Token") != settings.api_token:
+                    return JSONResponse({"detail": "invalid api token"}, status_code=401)
+            return await call_next(request)
 
     def _decide_and_store(request: DecisionRequest, mode: AutomationMode | None) -> Decision:
         decision = engine.decide(request, mode)
@@ -115,6 +127,14 @@ def create_app(
             executed = executor.execute(decision, operator_approved=True)
         except ExecutionBlocked as exc:
             raise HTTPException(409, str(exc)) from exc
+        except ExecutionFailed as exc:
+            partial = [a.value for a in exc.executed]
+            if partial:
+                store.mark_executed(decision_id, partial, operator=f"{body.operator} (partial)")
+            metrics["execution_failures_total"] += 1
+            raise HTTPException(
+                502, f"execution failed after {partial or 'no actions'}: {exc}"
+            ) from exc
         store.mark_executed(decision_id, [a.value for a in executed], operator=body.operator)
         metrics["executions_total"] += 1
         return {"decision_id": decision_id, "executed_actions": executed}
@@ -147,16 +167,26 @@ def create_app(
         metrics["webhook_decided_total"] += 1
 
         executed: list[str] = []
+        execution_error: str | None = None
         if (
             executor is not None
             and settings.mode in (AutomationMode.AUTO_PROFILE, AutomationMode.AUTO_APPROVE)
         ):
             try:
                 executed = [a.value for a in executor.execute(decision)]
-                if executed:
-                    store.mark_executed(decision.decision_id, executed, operator="auto")
             except ExecutionBlocked as exc:
                 logger.info("auto-execution blocked: %s", exc)
+            except ExecutionFailed as exc:
+                executed = [a.value for a in exc.executed]
+                execution_error = str(exc)
+                metrics["execution_failures_total"] += 1
+                logger.error("auto-execution failed after %s: %s", executed, exc)
+            if executed:
+                store.mark_executed(
+                    decision.decision_id,
+                    executed,
+                    operator="auto (partial)" if execution_error else "auto",
+                )
 
         return {
             "status": "decided",
@@ -166,6 +196,7 @@ def create_app(
             "mode": decision.mode,
             "action_plan": [a.model_dump() for a in decision.action_plan],
             "executed_actions": executed,
+            "execution_error": execution_error,
             "shadow_delta": decision.shadow_delta,
         }
 

@@ -139,6 +139,111 @@ def audit_sonarr(
     typer.echo(json.dumps(result.model_dump(), indent=2))
 
 
+@app.command()
+def execute(
+    decision_id: str = typer.Argument(help="Decision id, or 'last' for the most recent"),
+    operator: str = typer.Option(..., "--operator", help="Who is approving this execution"),
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt"),
+    config: str | None = _config_option,
+) -> None:
+    """Execute a stored decision's action plan (operator-approved writes to Seerr/Sonarr).
+
+    Respects the decision's automation mode and all write gates: shadow/recommend
+    decisions execute nothing, and allow_writes must be true for any write.
+    """
+    from .executor import ExecutionBlocked, ExecutionFailed
+    from .runtime import build_runtime
+
+    rt = build_runtime(config)
+    if decision_id == "last":
+        last = rt.store.last_decision()
+        if last is None:
+            typer.echo("no decisions recorded yet", err=True)
+            raise typer.Exit(1)
+        decision_id = last.decision_id
+    decision = rt.store.get_decision(decision_id)
+    if decision is None:
+        typer.echo("decision not found", err=True)
+        raise typer.Exit(1)
+
+    _print_decision(decision, False)
+    writes = [a for a in decision.action_plan if a.is_write]
+    if writes and not yes:
+        typer.confirm(
+            f"Execute {len(writes)} write action(s) as {operator}?", abort=True
+        )
+    try:
+        executed = rt.executor.execute(decision, operator_approved=True)
+    except ExecutionBlocked as exc:
+        typer.echo(f"blocked: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    except ExecutionFailed as exc:
+        partial = [a.value for a in exc.executed]
+        if partial:
+            rt.store.mark_executed(decision_id, partial, operator=f"{operator} (partial)")
+        typer.echo(f"failed after {partial or 'no actions'}: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    if executed:
+        rt.store.mark_executed(decision_id, [a.value for a in executed], operator=operator)
+        typer.echo(f"executed: {[a.value for a in executed]}")
+    else:
+        typer.echo("nothing executed (mode/plan permits no writes)")
+
+
+@app.command()
+def preflight(config: str | None = _config_option) -> None:
+    """Live contract check against Seerr/Sonarr: connectivity, profile resolution,
+    pending-request visibility. Read-only; run before enabling any write mode."""
+    from .runtime import build_runtime
+
+    rt = build_runtime(config)
+    failures = 0
+
+    def check(name: str, fn) -> None:
+        nonlocal failures
+        try:
+            typer.echo(f"[ok]   {name}: {fn()}")
+        except Exception as exc:  # noqa: BLE001 - report every failure, keep going
+            failures += 1
+            typer.echo(f"[fail] {name}: {exc}")
+
+    check(
+        "seerr sonarr servers",
+        lambda: [s.get("name") for s in rt.seerr.list_sonarr_servers()],
+    )
+    for profile_name in (
+        rt.settings.seerr.profile_name_1080p,
+        rt.settings.seerr.profile_name_2160p,
+    ):
+        check(
+            f"resolve profile '{profile_name}'",
+            lambda name=profile_name: rt.seerr.resolve_profile_id(name),
+        )
+    check(
+        "pending TV requests visible",
+        lambda: sum(
+            1
+            for r in rt.seerr.list_requests(filter="pending")
+            if (r.get("media") or {}).get("mediaType") == "tv"
+        ),
+    )
+    if rt.sonarr is not None:
+        check(
+            "sonarr quality profiles",
+            lambda: [p.get("name") for p in rt.sonarr.list_quality_profiles()],
+        )
+    else:
+        typer.echo("[skip] sonarr: not configured (shadow deltas and audits disabled)")
+    typer.echo(
+        f"mode={rt.settings.mode} allow_writes={rt.settings.allow_writes}"
+        f" auto_approve_enabled={rt.settings.auto_approve_enabled}"
+    )
+    if failures:
+        typer.echo(f"{failures} check(s) failed", err=True)
+        raise typer.Exit(1)
+    typer.echo("preflight passed")
+
+
 @app.command("review-pending")
 def review_pending(
     limit: int = typer.Option(20),

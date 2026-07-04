@@ -20,8 +20,8 @@ import logging
 
 from .config import Settings
 from .schemas import Action, ActionType, AutomationMode, Confidence, Decision
-from .seerr.client import RequestNotPendingError, SeerrClient
-from .sonarr.client import SonarrClient
+from .seerr.client import RequestNotPendingError, SeerrClient, SeerrError
+from .sonarr.client import SonarrClient, SonarrError
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,16 @@ _SONARR_FALLBACK_ACTIONS = {
 
 
 class ExecutionBlocked(Exception):
-    pass
+    """Pre-flight refusal: nothing has been written."""
+
+
+class ExecutionFailed(Exception):
+    """A write failed mid-plan. `executed` lists the actions that already ran,
+    so callers can durably record partial progress before surfacing the error."""
+
+    def __init__(self, message: str, executed: list[ActionType]):
+        super().__init__(message)
+        self.executed = executed
 
 
 class Executor:
@@ -95,7 +104,11 @@ class Executor:
             except RequestNotPendingError as exc:
                 # The request state changed between decision and execution
                 # (e.g. a human approved it in Seerr). Stop; audit will catch drift.
+                if executed:
+                    raise ExecutionFailed(str(exc), executed) from exc
                 raise ExecutionBlocked(str(exc)) from exc
+            except (SeerrError, SonarrError) as exc:
+                raise ExecutionFailed(str(exc), executed) from exc
             executed.append(action.type)
         return executed
 

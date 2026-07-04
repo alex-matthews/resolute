@@ -127,7 +127,7 @@ held/low-confidence decisions never execute regardless of mode. Follow
 
 ```text
 src/tv_decider/     engine, schemas, seerr/sonarr adapters, judge, store, api, cli
-tests/              96 no-network tests
+tests/              104 no-network tests
 fixtures/           seerr/sonarr payloads, evidence bundles, golden expectations
 config/             config + household policy examples
 deploy/kubernetes/  Flux/app-template manifests (home-ops style)
