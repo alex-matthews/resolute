@@ -1,11 +1,10 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-# Setup dependency (home-operations pattern, works on a personal account):
-# requires BOT_CLIENT_ID / BOT_APP_PRIVATE_KEY secrets for a GitHub App you
-# own, plus a `.github` repo under the same account running a dispatchable
-# self-hosted Renovate workflow (renovate.yaml with an autodiscoverFilter
-# input). If you install the Mend-hosted Renovate App on this repo instead,
-# delete this workflow — .renovaterc.json5 is picked up automatically.
+# Direct self-hosted Renovate run against this repo. Requires secrets for a
+# GitHub App you own (personal accounts can own apps) installed on this repo
+# with contents/pull-requests/issues/workflows write: BOT_APP_CLIENT_ID and
+# BOT_APP_PRIVATE_KEY. Repository-level Renovate config stays in
+# .renovaterc.json5 and is read by Renovate itself.
 name: Renovate
 
 on:
@@ -14,9 +13,29 @@ on:
       - main
     paths:
       - .renovaterc.json5
+      - .github/workflows/renovate.yaml
+  schedule:
+    - cron: 0 */6 * * *
   workflow_dispatch:
+    inputs:
+      dryRun:
+        description: Dry run mode
+        default: "false"
+        required: false
+      logLevel:
+        description: Log level
+        default: info
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 permissions: {}
+
+env:
+  # renovate: datasource=docker depName=ghcr.io/renovatebot/renovate
+  RENOVATE_VERSION: 43.251.3
 
 jobs:
   renovate:
@@ -27,28 +46,25 @@ jobs:
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
-          client-id: ${{ secrets.BOT_CLIENT_ID }}
+          client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: ".github"
-          permission-actions: write
+          permission-checks: read
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+          permission-statuses: read
+          permission-workflows: write
 
       - name: Run Renovate
-        id: dispatch
+        uses: renovatebot/github-action@dd5302ec17783b2fc721b19ae7209b57b1587765 # v46.1.17
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          renovate-version: ${{ env.RENOVATE_VERSION }}
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          OWNER: ${{ github.repository_owner }}
-          REPO_NAME: ${{ github.event.repository.name }}
-        run: |
-          RUN_URL=$(gh workflow run renovate.yaml \
-            --repo "${OWNER}/.github" \
-            --ref main \
-            --field "autodiscoverFilter=${REPO_NAME}")
-          echo "run_id=${RUN_URL##*/}" >> "$GITHUB_OUTPUT"
-
-      - name: Await Renovate Completion
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          OWNER: ${{ github.repository_owner }}
-          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
-        run: gh run watch --repo "${OWNER}/.github" "${RUN_ID}" --exit-status
+          LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
+          RENOVATE_AUTODISCOVER: "false"
+          RENOVATE_DRY_RUN: ${{ inputs.dryRun == 'true' && 'full' || null }}
+          RENOVATE_ONBOARDING: "false"
+          RENOVATE_PLATFORM: github
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_REQUIRE_CONFIG: required
