@@ -154,7 +154,7 @@ mise run build        # docker build (needs a Docker daemon)
 mise run ci           # core CI checks (everything except the container build)
 ```
 
-Runtime is Python 3.14 on a digest-pinned `python:3.14-slim` base; Renovate
+Runtime is Python 3.14 on a digest-pinned `python:3.14-alpine3.24` base; Renovate
 (extending `home-operations/renovate-config`) maintains the base-image digest,
 the uv lockfile, GitHub Action SHAs, mise tool versions, and the app-template
 chart reference. Releases are cut by release-please; images are multi-arch
