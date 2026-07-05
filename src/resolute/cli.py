@@ -247,9 +247,45 @@ def preflight(config: str | None = _config_option) -> None:
 @app.command("review-pending")
 def review_pending(
     limit: int = typer.Option(20),
+    remote: str | None = typer.Option(
+        None,
+        help="Base URL of a running resolute API to review through, instead of "
+        "opening the local store. For schedulers/cronjobs: the API pod owns "
+        "the single-writer SQLite store, so out-of-pod runs must go through "
+        "it. Sends X-Resolute-Api-Token from $RESOLUTE_API_TOKEN when set.",
+    ),
     config: str | None = _config_option,
 ) -> None:
     """Scheduled review: decide every pending Seerr TV request (shadow-safe)."""
+    if remote is not None:
+        import os
+
+        import httpx
+
+        headers = {}
+        token = os.environ.get("RESOLUTE_API_TOKEN")
+        if token:
+            headers["X-Resolute-Api-Token"] = token
+        try:
+            resp = httpx.post(
+                f"{remote.rstrip('/')}/api/reviews/pending",
+                params={"limit": limit},
+                headers=headers,
+                timeout=300,
+            )
+        except httpx.HTTPError as exc:
+            # Sanitized by construction: URL carries no credentials.
+            typer.echo(f"remote review failed: {type(exc).__name__}", err=True)
+            raise typer.Exit(1) from None
+        if resp.status_code != 200:
+            typer.echo(
+                f"remote review failed: HTTP {resp.status_code}: {resp.text}",
+                err=True,
+            )
+            raise typer.Exit(1)
+        typer.echo(resp.text)
+        return
+
     from .metadata.source import seerr_request_state_from_api
     from .runtime import build_runtime
 
