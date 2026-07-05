@@ -28,6 +28,11 @@ COPY --from=build /app/.venv /app/.venv
 # /config/policy.yaml (ConfigMap); `nobody:nogroup` is only the default
 # for bare `docker run`s. Bytecode is precompiled at build time, so the
 # image runs with a read-only rootfs under any arbitrary uid:gid.
+# /config and /data exist empty (no chown) so ConfigMap subPath/file
+# mounts and PVC mount points have stable targets under kubelet with a
+# read-only rootfs, not just under Docker bind mounts.
+RUN mkdir -p /config /data
+
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
