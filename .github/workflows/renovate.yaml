@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # Direct self-hosted Renovate run against this repo. Requires secrets for a
 # GitHub App you own (personal accounts can own apps) installed on this repo
-# with contents/pull-requests/issues/statuses/workflows write and checks read:
+# with contents/pull-requests/issues/statuses/workflows write and administration/checks read:
 # BOT_APP_CLIENT_ID and BOT_APP_PRIVATE_KEY. Repository-level Renovate config
 # stays in .renovaterc.json5 and is read by Renovate itself.
 name: Renovate
@@ -48,6 +48,7 @@ jobs:
         with:
           client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-administration: read
           permission-checks: read
           permission-contents: write
           permission-issues: write
@@ -65,6 +66,7 @@ jobs:
           # mise lockfile refresh: Renovate must run `mise lock`, which it
           # gates as an unsafe execution, and mise itself must trust the
           # checked-out config (same pair the home-operations runner sets).
+          RENOVATE_ALLOWED_COMMANDS: '["^helm-docs --chart-search-root=\\. --log-level=warn$","^helm-schema --chart-search-root \\. --skip-auto-generation required,additionalProperties --append-newline$"]'
           RENOVATE_ALLOWED_UNSAFE_EXECUTIONS: '["mise"]'
           RENOVATE_AUTODISCOVER: "false"
           RENOVATE_CUSTOM_ENV_VARIABLES: '{"MISE_TRUSTED_CONFIG_PATHS":"/tmp/renovate/repos"}'
