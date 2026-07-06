@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # Direct self-hosted Renovate run against this repo. Requires secrets for a
 # GitHub App you own (personal accounts can own apps) installed on this repo
-# with contents/pull-requests/issues/workflows write and checks/statuses read:
+# with contents/pull-requests/issues/statuses/workflows write and checks read:
 # BOT_APP_CLIENT_ID and BOT_APP_PRIVATE_KEY. Repository-level Renovate config
 # stays in .renovaterc.json5 and is read by Renovate itself.
 name: Renovate
@@ -52,7 +52,7 @@ jobs:
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
-          permission-statuses: read
+          permission-statuses: write
           permission-workflows: write
 
       - name: Run Renovate
