@@ -34,7 +34,45 @@ jobs:
 
       - name: Release Please
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release-please
         with:
           token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Release Please bumps the version in pyproject.toml but not uv.lock, so
+      # `uv sync --locked` (tests and the image build) fails on the release PR.
+      # Regenerate uv.lock on the release branch whenever a release PR is open.
+      # Self-heals: every push to main rebuilds the branch and re-runs this.
+      - name: Checkout release branch
+        if: ${{ steps.release-please.outputs.pr }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: release-please--branches--main
+          persist-credentials: false
+
+      - name: Setup Mise
+        if: ${{ steps.release-please.outputs.pr }}
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          cache: false
+          experimental: true
+          install_args: --locked
+
+      - name: Sync uv.lock to release version
+        if: ${{ steps.release-please.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          uv lock
+          if git diff --quiet -- uv.lock; then
+            echo "uv.lock already in sync"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          git commit -m "chore: sync uv.lock with release version"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git push origin HEAD:release-please--branches--main
