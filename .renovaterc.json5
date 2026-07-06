@@ -14,5 +14,15 @@
       automerge: false,
       ignoreTests: false,
     },
+    {
+      description: "Group uv updates (container image + mise toolchain) into one PR",
+      groupName: "uv",
+      matchDepNames: ["uv", "ghcr.io/astral-sh/uv"],
+    },
+    {
+      description: "Group python updates (container image + mise toolchain) into one PR",
+      groupName: "python",
+      matchDepNames: ["python"],
+    },
   ],
 }
