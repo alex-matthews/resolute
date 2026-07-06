@@ -31,12 +31,18 @@ precedent.
   restore drill (scratch PVC → integrity_check → recency query).
 - **Workflow parity audit (H9):** the action pins shared with home-ops
   (checkout, mise-action, create-github-app-token, renovate action)
-  match the live workflows exactly. Intentional divergences: pinned
-  `RENOVATE_VERSION` + `RENOVATE_REPOSITORIES` + mise unsafe-execution
-  env (code repos need `mise lock`; home-ops itself autodiscovers and
-  runs latest); docker/release-please/trivy/codeql actions have no
-  home-ops counterpart and stay as adopted, SHA-pinned. No cosmetic
-  churn.
+  match the live workflows exactly. Intentional divergences: explicit
+  `RENOVATE_REPOSITORIES` + mise unsafe-execution env (code repos need
+  `mise lock`; home-ops itself autodiscovers); docker/release-please/
+  trivy/codeql actions have no home-ops counterpart and stay as adopted,
+  SHA-pinned. No cosmetic churn.
+- **CI follow-ups (post-initial-drop):** the Renovate engine version is
+  no longer pinned separately — it follows the SHA-pinned
+  `renovatebot/github-action` (matching home-ops); `uv` and `python`
+  updates are grouped across the container image and mise toolchain; and
+  the Release Please workflow re-runs `uv lock` on the release branch
+  after a version bump so `uv sync --locked` stays green (release-please
+  updates `pyproject.toml` but not `uv.lock`).
 - **Secrets audit (H10):** SeerrClient exceptions embed the request URL
   (via httpx), but the API key travels in the `X-Api-Key` header and
   never in the URL or params, so nothing sensitive can leak through
