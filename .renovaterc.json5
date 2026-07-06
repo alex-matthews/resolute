@@ -1,4 +1,12 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>home-operations/renovate-config"],
+  packageRules: [
+    {
+      description: "Open PRs for GitHub Actions updates because main requires pull requests",
+      matchManagers: ["github-actions"],
+      automerge: false,
+      ignoreTests: false,
+    },
+  ],
 }
