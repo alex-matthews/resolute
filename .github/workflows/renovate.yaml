@@ -66,7 +66,6 @@ jobs:
           # mise lockfile refresh: Renovate must run `mise lock`, which it
           # gates as an unsafe execution, and mise itself must trust the
           # checked-out config (same pair the home-operations runner sets).
-          RENOVATE_ALLOWED_COMMANDS: '["^helm-docs --chart-search-root=\\. --log-level=warn$","^helm-schema --chart-search-root \\. --skip-auto-generation required,additionalProperties --append-newline$"]'
           RENOVATE_ALLOWED_UNSAFE_EXECUTIONS: '["mise"]'
           RENOVATE_AUTODISCOVER: "false"
           RENOVATE_CUSTOM_ENV_VARIABLES: '{"MISE_TRUSTED_CONFIG_PATHS":"/tmp/renovate/repos"}'
