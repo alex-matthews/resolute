@@ -6,8 +6,15 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "**.md"
+    paths:
+      - .github/workflows/release.yaml
+      - .python-version
+      - Dockerfile
+      - config/**
+      - pyproject.toml
+      - scripts/**
+      - uv.lock
+      - src/**
   release:
     types:
       - published
