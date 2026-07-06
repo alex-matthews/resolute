@@ -1,6 +1,12 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>home-operations/renovate-config"],
+  // The shared preset also serves Helm chart repos. Resolute has no chart
+  // artifacts, so do not inherit those post-upgrade generators here.
+  postUpgradeTasks: {
+    commands: [],
+    fileFilters: [],
+  },
   packageRules: [
     {
       description: "Open PRs for GitHub Actions updates because main requires pull requests",
