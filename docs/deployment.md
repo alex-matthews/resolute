@@ -73,7 +73,7 @@ if `/config/policy.yaml` is not mounted.
 ## Direct webhook (default shape)
 
 ```text
-Seerr ──POST──> http://resolute.default.svc.cluster.local:8080/api/webhooks/seerr
+Seerr ──POST──> http://resolute.default.svc.cluster.local/api/webhooks/seerr
 ```
 
 In Seerr: Settings -> Notifications -> Webhook:
@@ -123,7 +123,7 @@ this repo deliberately ships no Chaski manifests to avoid guessing them.
 
 ```bash
 docker build -t resolute .
-docker run -p 8080:8080 \
+docker run -p 8080:8080 -p 8081:8081 \
   -v resolute-data:/data \
   -v $(pwd)/config/policy.yaml:/config/policy.yaml:ro \
   -e RESOLUTE_SEERR__URL=http://seerr.local \
@@ -142,7 +142,8 @@ Three independent credentials, all optional-but-recommended layers:
   (`X-Resolute-Operator-Token`); while unset, HTTP execution is disabled entirely
   and `resolute execute` (CLI, via `kubectl exec`) is the only write path.
 - `api_token` — gates every other `/api/*` endpoint (`X-Resolute-Api-Token`).
-  Health/readiness/metrics stay open for probes and scrapers. Set this once
+  Health/readiness (main port) and `/metrics` (the 8081 listener) stay open
+  for probes and scrapers. Set this once
   the judge is enabled: decision endpoints can trigger paid model calls, and
   "internal-only ClusterIP" is a topology, not an authorization model.
 
@@ -188,7 +189,10 @@ trigger mentioned in the design docs.
 
 ## Observability
 
-- `/healthz` (liveness), `/readyz` (readiness, proves DB access), `/metrics`
-  (Prometheus text: decisions by resolution, webhook outcomes, feedback,
-  executions, audits).
+- `/healthz` (liveness) and `/readyz` (readiness, proves DB access) on the
+  main port (8080).
+- `/metrics` (Prometheus text: decisions by resolution, webhook outcomes,
+  feedback, executions, audits) on a **dedicated 8081 listener**, kept off the
+  main port so a future route never exposes it (home-operations org
+  convention; `RESOLUTE_METRICS_PORT` / `RESOLUTE_METRICS_ENABLED`).
 - Structured stdout logging; `RESOLUTE_LOG_LEVEL=DEBUG` for wire-level detail.

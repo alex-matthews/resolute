@@ -1,6 +1,6 @@
 # API Examples
 
-Base URL in-cluster: `http://resolute.default.svc.cluster.local:8080`
+Base URL in-cluster: `http://resolute.default.svc.cluster.local`
 
 If `api_token` is configured, every `/api/*` call below (except the webhook,
 which uses its own shared secret) additionally needs
