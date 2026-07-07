@@ -37,8 +37,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     RESOLUTE_DB_PATH=/data/resolute.db \
-    RESOLUTE_POLICY_PATH=/config/policy.yaml \
-    RESOLUTE_LISTEN_PORT=8080
+    RESOLUTE_POLICY_PATH=/config/policy.yaml
 
 USER nobody:nogroup
 # 8080 main app, 8081 metrics (home-operations org port convention).
