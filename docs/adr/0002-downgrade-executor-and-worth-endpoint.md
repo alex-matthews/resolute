@@ -55,10 +55,11 @@ Two properties of this that the design must respect:
   cosmetic. A profile that still rewards 2160p under the 1080p profile would
   not reclaim.
 - **Reclaim vs Recycle Bin.** "Deleted to import an upgrade" honours Sonarr's
-  Recycle Bin; if one is configured the UHD file moves there and space is not
-  freed until the bin is cleared. Reclaim is a two-step outcome (replace, then
-  bin-clear), not instantaneous. *(Open item from the spike: confirm actual
-  disk reclamation vs. deferred bin retention.)*
+  Recycle Bin. This deployment runs **no Recycle Bin**, so the delete frees
+  disk immediately and reclaim is single-step (confirmed 2026-07-07). If a
+  Recycle Bin is ever configured, reclaim becomes deferred until the bin is
+  cleared, and the executor's "estimated GB reclaimed" would have to account
+  for it.
 
 ## Decision
 
