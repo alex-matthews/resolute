@@ -38,10 +38,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     RESOLUTE_DB_PATH=/data/resolute.db \
     RESOLUTE_POLICY_PATH=/config/policy.yaml \
-    RESOLUTE_LISTEN_PORT=8130
+    RESOLUTE_LISTEN_PORT=8080
 
 USER nobody:nogroup
-EXPOSE 8130
+# 8080 main app, 8081 metrics (home-operations org port convention).
+EXPOSE 8080 8081
 
 ENTRYPOINT ["resolute"]
 CMD ["serve"]
