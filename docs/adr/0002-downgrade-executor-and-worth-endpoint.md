@@ -39,21 +39,26 @@ custom-format profile:
   Score **+1780**), then logged *"File was deleted to import an upgrade"* for
   the 2160p file.
 
-The reason: under a TRaSH/recyclarr WEB-1080p profile, the resident 2160p file
-re-scores *below* a 1080p release, so the lower resolution becomes the
-higher-scored **upgrade** target and Sonarr's ordinary upgrade path runs. That
-path is **import-then-delete**: the replacement lands first, the old file is
-removed second — so there is **no delete-first step, no no-file window, and no
-"deleted the only copy with no replacement" risk.** Resolute never deletes
-anything; Sonarr does, safely, as it does for any upgrade.
+The reason (confirmed by follow-up testing, **not** custom-format-dependent):
+the WEB-1080p profile does **not include 2160p in its quality list**, so the
+resident 2160p file is **out-of-profile / unwanted**, and Sonarr replaces it
+with any in-profile 1080p — a **quality-tier** decision, not a scoring contest.
+The +1780 CF score in the first spike was the release-group tier, incidental to
+the swap. Sonarr's replace path is **import-then-delete**: the replacement
+lands first, the old file is removed second — so there is **no delete-first
+step, no no-file window, and no "deleted the only copy with no replacement"
+risk** (if no 1080p is ever obtainable, the 2160p simply stays). Resolute never
+deletes anything; Sonarr does, safely, as it does for any upgrade.
 
 Two properties of this that the design must respect:
 
-- **Profile-scoring dependency.** It works only because the target profile
-  scores the target resolution *above* the resident higher-resolution file.
-  That is a recyclarr/TRaSH profile invariant — now load-bearing, not
-  cosmetic. A profile that still rewards 2160p under the 1080p profile would
-  not reclaim.
+- **Quality-list invariant (load-bearing).** It works because the 1080p-target
+  profile **excludes 2160p from its quality list**, making the resident file
+  out-of-profile. This is a **checkable config property** (inspect the
+  profile's quality list) — not a fragile scoring margin, and confirmed not
+  CF-dependent. A profile that *includes* 2160p above 1080p would need a CF
+  contest instead and generally would not reclaim (that is the fallback's
+  domain).
 - **Reclaim vs Recycle Bin.** "Deleted to import an upgrade" honours Sonarr's
   Recycle Bin. This deployment runs **no Recycle Bin**, so the delete frees
   disk immediately and reclaim is single-step (confirmed 2026-07-07). If a
@@ -87,11 +92,13 @@ Sonarr's own upgrade flow, not a hand-rolled delete. Triggered by a Costanza
 Sequence:
 
 1. **Preconditions** (any failure ⇒ `ExecutionBlocked`, reported, no writes):
-   the title carries a Costanza protection; the target profile does not score
-   the target resolution above the resident file (verifiable via an
-   interactive-search dry-run — no grabbable 1080p that out-scores current);
-   the series is airing or has episodes queued/downloading; the decision is
-   stale; `RESOLUTE_ALLOW_WRITES=false`.
+   the title carries a Costanza protection; the target profile still lists
+   2160p (a misconfiguration for reclaim — leaves the resident in-profile;
+   the executor verifies the profile *excludes* 2160p); the series is airing or
+   has episodes queued/downloading; the decision is stale;
+   `RESOLUTE_ALLOW_WRITES=false`. Note: *no 1080p available* is **not** a
+   blocker — Sonarr deletes only on import, so the 2160p is retained and the
+   run simply reports zero reclaim.
 2. **Write-ahead audit** row (target profile, resident files, expected
    reclaim, Costanza decision id), UNIQUE per decision, before any write.
 3. **Reclaim:** `update_series_profile` → the 1080p-target profile, then
@@ -137,10 +144,12 @@ visually-important title is reclaimed.
   import-then-delete upgrade path. It still ships report-only and climbs the
   trust ladder, because it *causes* deletions downstream — but the no-file
   window and orphaned-delete risks are gone.
-- New load-bearing dependency: a **recyclarr/TRaSH 1080p profile** whose custom
-  formats score the target resolution above the resident file. This belongs in
-  version control alongside the profiles, and the executor treats "target
-  release out-scores resident" as a hard precondition.
+- New load-bearing dependency: a **1080p-target profile that excludes 2160p
+  from its quality list** (so the resident is out-of-profile). A checkable
+  config property — belongs in version control with the recyclarr-managed
+  profiles; the executor verifies it before acting. Confirmed *not*
+  CF-margin-dependent, so it holds for any release regardless of group or
+  PROPER status.
 - New inbound coupling: Costanza calls the worth endpoint (soft) and hands off
   downgrade decisions (hard, only once admin-confirm+ is enabled).
 
@@ -150,9 +159,11 @@ visually-important title is reclaimed.
   (auto or triggered) is what runs the upgrade-replace. The executor triggers
   it.
 - **Delete-first, then re-grab.** The original design here; demoted to a
-  **fallback** only for setups without custom-format profiles (where the
-  resident 2160p can't be out-scored). It reintroduces the no-file window and
-  the never-delete-without-replacement precondition, so it is not the baseline.
+  **fallback** only for profiles that *include* 2160p in their quality list
+  (resident not out-of-profile, so a plain 1080p won't replace it). It
+  reintroduces the no-file window and the never-delete-without-replacement
+  precondition, so it is not the baseline — the recommended config simply
+  excludes 2160p from the target profile.
 - **Manual-import override.** Not needed — the spike auto-imported. Retained
   only as a manual recovery path if a specific grab parks in the queue.
 - **Execute from Costanza.** ADR-0011 / ADR-0003: Costanza never touches
