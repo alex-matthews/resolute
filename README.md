@@ -54,7 +54,7 @@ export RESOLUTE_CONFIG_FILE=config/config.yaml
 export RESOLUTE_SEERR__API_KEY=...
 export RESOLUTE_SONARR__API_KEY=...   # optional: enables shadow deltas + audits
 
-resolute serve                 # API on :8130
+resolute serve                 # API on :8080
 resolute decide "Severance" --year 2022        # live metadata via Seerr
 resolute plan-seerr --seerr-request-id 123     # plan for a pending request
 resolute review-pending                        # sweep all pending TV requests
@@ -65,7 +65,7 @@ resolute audit-library --limit 50              # shadow-audit Sonarr drift
 
 Settings -> Notifications -> Webhook in Seerr:
 
-- **URL**: `http://resolute.default.svc.cluster.local:8130/api/webhooks/seerr`
+- **URL**: `http://resolute.default.svc.cluster.local:8080/api/webhooks/seerr`
 - **Custom header**: `X-Resolute-Token: <your shared secret>` (matches
   `seerr.webhook_shared_secret`)
 - **Notification types**: enable "Request Pending Approval"
