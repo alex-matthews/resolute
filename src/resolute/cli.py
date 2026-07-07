@@ -461,19 +461,39 @@ def serve(
     config: str | None = _config_option,
 ) -> None:
     """Run the HTTP API."""
+    import asyncio
+
     import uvicorn
 
     from .runtime import build_runtime
-    from .api.app import create_app
+    from .api.app import create_app, create_metrics_app
 
     rt = build_runtime(config)
     api = create_app(rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr)
-    uvicorn.run(
-        api,
-        host=host or rt.settings.listen_host,
-        port=port or rt.settings.listen_port,
-        log_level=rt.settings.log_level.lower(),
-    )
+    bind_host = host or rt.settings.listen_host
+    log_level = rt.settings.log_level.lower()
+    configs = [
+        uvicorn.Config(
+            api, host=bind_host, port=port or rt.settings.listen_port, log_level=log_level
+        )
+    ]
+    # Metrics on a dedicated listener (org convention: 8081, off the main port).
+    if rt.settings.metrics_enabled:
+        metrics_api = create_metrics_app(api.state.metrics)
+        configs.append(
+            uvicorn.Config(
+                metrics_api,
+                host=bind_host,
+                port=rt.settings.metrics_port,
+                log_level=log_level,
+            )
+        )
+    servers = [uvicorn.Server(c) for c in configs]
+
+    async def _run() -> None:
+        await asyncio.gather(*(s.serve() for s in servers))
+
+    asyncio.run(_run())
 
 
 if __name__ == "__main__":

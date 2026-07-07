@@ -159,7 +159,11 @@ class Settings(BaseSettings):
     policy_path: Path = Path("config/policy.yaml")
 
     listen_host: str = "0.0.0.0"
-    listen_port: int = 8130
+    listen_port: int = 8080
+    # Metrics on a separate listener (home-operations org convention: main app
+    # on 8080, /metrics on 8081, kept off the possibly-exposed main port).
+    metrics_port: int = 8081
+    metrics_enabled: bool = True
     log_level: str = "INFO"
 
     seerr: SeerrSettings = Field(default_factory=SeerrSettings)

@@ -13,7 +13,7 @@ set -euo pipefail
 
 IMAGE="${IMAGE:-resolute:smoke}"
 NAME="resolute-k8s-smoke-$$"
-PORT="${PORT:-18130}"
+PORT="${PORT:-18080}"
 
 if [ -z "${IMAGE_PREBUILT:-}" ]; then
   docker build -t "$IMAGE" .
@@ -39,7 +39,7 @@ docker run -d --name "$NAME" \
   -e HOME=/nonexistent \
   -v "$tmp/data:/data" \
   -v "$PWD/config/policy.example.yaml:/config/policy.yaml:ro" \
-  -p "127.0.0.1:$PORT:8130" \
+  -p "127.0.0.1:$PORT:8080" \
   "$IMAGE" >/dev/null
 
 for _ in $(seq 1 60); do
