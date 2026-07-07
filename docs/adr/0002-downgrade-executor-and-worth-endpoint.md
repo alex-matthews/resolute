@@ -22,20 +22,43 @@ and `household` recommendations). Two seams land in Resolute:
 Today Resolute's Sonarr surface is deliberately minimal: `sonarr/client.py`
 reads profiles/series and has exactly one write, `update_series_profile`,
 under a standing discipline that Resolute **never triggers a Sonarr search
-and never deletes files** (the client's race note). The executor below is the
-one gated place that discipline is lifted — mirroring how Costanza's ADR-0009
-lifts its no-external-writes rule for exactly one module.
+and never deletes files** (the client's race note). The executor below lifts
+**only the "never triggers a search" half** of that discipline; the "never
+deletes" half stands — Sonarr does the deletion, as part of its own upgrade
+flow (see Verification).
 
-## Verification (Sonarr behaviour that drives the design)
+## Verification (spike, 2026-07-07 — the mechanism that makes this safe)
 
-Sonarr does **not** downgrade in place. Re-pointing a series at a
-1080p-cutoff profile leaves an existing 2160p file *above* cutoff, so Sonarr
-keeps it — a profile change alone reclaims nothing. Reclaiming UHD space
-therefore requires **deleting the UHD episode files** so the episodes read as
-missing, after which the new profile grabs 1080p. And Sonarr will not grab
-1080p while the 2160p file exists (cutoff already met), so grab-then-delete is
-unavailable in vanilla Sonarr — the delete must precede the re-grab. This
-shapes the verb and its guards.
+Reclaiming was expected to require deleting the UHD files first (Sonarr won't
+grab *below* cutoff). A spike against the live Sonarr disproved that for a
+custom-format profile:
+
+- Switched *The Continental (2023)* from `WEB-2160p` to `WEB-1080p`, then ran
+  **Search Monitored** — no forced grab, no manual import.
+- Sonarr auto-grabbed and **auto-imported** a 1080p release (Custom Format
+  Score **+1780**), then logged *"File was deleted to import an upgrade"* for
+  the 2160p file.
+
+The reason: under a TRaSH/recyclarr WEB-1080p profile, the resident 2160p file
+re-scores *below* a 1080p release, so the lower resolution becomes the
+higher-scored **upgrade** target and Sonarr's ordinary upgrade path runs. That
+path is **import-then-delete**: the replacement lands first, the old file is
+removed second — so there is **no delete-first step, no no-file window, and no
+"deleted the only copy with no replacement" risk.** Resolute never deletes
+anything; Sonarr does, safely, as it does for any upgrade.
+
+Two properties of this that the design must respect:
+
+- **Profile-scoring dependency.** It works only because the target profile
+  scores the target resolution *above* the resident higher-resolution file.
+  That is a recyclarr/TRaSH profile invariant — now load-bearing, not
+  cosmetic. A profile that still rewards 2160p under the 1080p profile would
+  not reclaim.
+- **Reclaim vs Recycle Bin.** "Deleted to import an upgrade" honours Sonarr's
+  Recycle Bin; if one is configured the UHD file moves there and space is not
+  freed until the bin is cleared. Reclaim is a two-step outcome (replace, then
+  bin-clear), not instantaneous. *(Open item from the spike: confirm actual
+  disk reclamation vs. deferred bin retention.)*
 
 ## Decision
 
@@ -49,78 +72,90 @@ rationale: it folds in household-subjective and storage-context terms the
 council itself owns).
 
 - Pure and side-effect-free; deterministic from metadata; records no decision.
-- Takes the Sonarr-native `tvdb_id` (what Costanza's retention candidates
-  carry) and resolves TMDB facts through Resolute's existing id mapping;
-  returns `worth: unavailable` when metadata can't be resolved, so Costanza's
-  evidence degrades gracefully rather than blocking a case (ADR-0011).
+- Takes the Sonarr-native `tvdb_id` and resolves TMDB facts through Resolute's
+  existing id mapping; returns `worth: unavailable` when metadata can't be
+  resolved, so Costanza's evidence degrades gracefully rather than blocking a
+  case (ADR-0011).
 - Small and low-risk: reuses scoring, metadata, and API auth already in place.
 
-### 2. Downgrade executor (`executors/sonarr_downgrade`, destructive, gated)
+### 2. Downgrade executor (`executors/sonarr_downgrade`, gated)
 
-One module, one verb: **reclaim a TV series to 1080p**. Triggered by a
-Costanza `downgrade` handoff carrying the decision id + `tvdb_id`
-(+ target profile). Sequence:
+One module, one verb: **reclaim a TV series to 1080p** — implemented as
+Sonarr's own upgrade flow, not a hand-rolled delete. Triggered by a Costanza
+`downgrade` handoff carrying the decision id + `tvdb_id` (+ target profile).
+Sequence:
 
 1. **Preconditions** (any failure ⇒ `ExecutionBlocked`, reported, no writes):
-   the title carries a Costanza protection; no obtainable 1080p release
-   (search, don't grab — **never delete without a confirmed replacement
-   path**); the series is airing or has episodes queued/downloading; the
-   decision is stale; `RESOLUTE_ALLOW_WRITES=false`.
-2. **Write-ahead audit** row (files to delete, estimated reclaim, Costanza
-   decision id), UNIQUE per decision, *before* any destructive call — a crash
-   leaves evidence and recovery never double-deletes.
-3. **Reclaim:** set the 1080p-target profile → delete the UHD episode files →
-   trigger a search → monitor the 1080p re-grab through to import; alert on
-   failure. The brief no-file window (delete → 1080p import) is inherent to
-   Sonarr's no-downgrade behaviour; it is accepted, bounded by the
-   pre-verified availability and the re-grab monitoring.
+   the title carries a Costanza protection; the target profile does not score
+   the target resolution above the resident file (verifiable via an
+   interactive-search dry-run — no grabbable 1080p that out-scores current);
+   the series is airing or has episodes queued/downloading; the decision is
+   stale; `RESOLUTE_ALLOW_WRITES=false`.
+2. **Write-ahead audit** row (target profile, resident files, expected
+   reclaim, Costanza decision id), UNIQUE per decision, before any write.
+3. **Reclaim:** `update_series_profile` → the 1080p-target profile, then
+   trigger a monitored search. Sonarr's normal upgrade path grabs 1080p,
+   imports it, and deletes the replaced 2160p file (import-then-delete). The
+   executor monitors the grab→import to completion and records the outcome;
+   Resolute itself deletes nothing.
 
-Staging mirrors ADR-0009 / ADR-0011 but **starts more conservative because
-this executor deletes files** (the Seerr executor only creates requests):
+Staging mirrors ADR-0009 / ADR-0011. The blast radius is smaller than first
+feared (Resolute's write is profile-set + search-trigger; the destructive
+delete is Sonarr's vetted upgrade-replace), but it *does* cause file deletion
+downstream, so it still climbs the ladder rather than shipping hot:
 
-- **Report-only (default):** dry-run emits the exact plan — which files,
-  which profile, estimated GB reclaimed — as a report; no writes. Ships here
-  and stays here until proven.
+- **Report-only (default):** dry-run emits the exact plan — target profile,
+  the 1080p release that would win, estimated GB reclaimed — as a report; no
+  writes.
 - **Admin-confirm one-click (flag, ships OFF):** executes on an admin,
   server-side-identity-checked press; exactly once.
 - **Capped-auto (flag, ships OFF, far future):** only after admin-confirm
-  history proves the thresholds; hard-capped, cap-fallback to confirm.
-- `RESOLUTE_ALLOW_WRITES=false` forces dry-run at every phase (the existing
-  master switch, reused).
+  history proves it; hard-capped, cap-fallback to confirm.
+- `RESOLUTE_ALLOW_WRITES=false` forces dry-run at every phase.
 
-Scope fence: this executor reclaims-to-1080p for **Sonarr TV series only**. It
-never deletes a series (Maintainerr, ADR-0003), never touches Radarr/movies
-(Resolute is TV-only), and is separate from the request-time profile-set path.
+Scope fence: reclaims-to-1080p for **Sonarr TV series only**. Never deletes a
+series (Maintainerr, ADR-0003), never touches Radarr/movies (Resolute is
+TV-only), separate from the request-time profile-set path.
+
+Note (quality semantics, not mechanism): a 2160p→1080p reclaim also drops HDR
+(HDR10 → SDR), not just resolution — which is precisely what the
+objective-worth evidence and the council vote exist to weigh before a
+visually-important title is reclaimed.
 
 ## Consequences
 
 - Resolute becomes a **bidirectional quality brain** — request-time
   up-selection and retention down-selection — under one policy vocabulary and
   one audit trail. The objective score gains a second consumer (Costanza's
-  evidence) beside Resolute's own decisions.
-- Resolute's Sonarr write surface grows from "profile-set only, no search, no
-  delete" to "+ file-delete + search," confined to this one gated module; the
-  client race-note discipline stands everywhere else.
-- This is Resolute's **first destructive verb.** It ships report-only,
-  guarded by the 1080p-availability precondition and re-grab monitoring, with
-  a higher bar to enable than the non-destructive Seerr executor — the trust
-  ladder is real, not ceremonial.
-- New inbound coupling: Costanza calls the worth endpoint (soft dependency)
-  and hands off downgrade decisions (hard, only once admin-confirm+ is
-  enabled). Resolute owns the Sonarr risk; Costanza owns the decision and its
-  reasons.
+  evidence).
+- Resolute's Sonarr write surface grows by exactly **"trigger a search"**; the
+  "never deletes files" discipline is **retained** (Sonarr owns the delete via
+  its upgrade flow). Smaller and safer than the delete-first design this ADR
+  originally carried.
+- Not a hand-rolled destructive verb: Resolute drives Sonarr's ordinary,
+  import-then-delete upgrade path. It still ships report-only and climbs the
+  trust ladder, because it *causes* deletions downstream — but the no-file
+  window and orphaned-delete risks are gone.
+- New load-bearing dependency: a **recyclarr/TRaSH 1080p profile** whose custom
+  formats score the target resolution above the resident file. This belongs in
+  version control alongside the profiles, and the executor treats "target
+  release out-scores resident" as a hard precondition.
+- New inbound coupling: Costanza calls the worth endpoint (soft) and hands off
+  downgrade decisions (hard, only once admin-confirm+ is enabled).
 
-## Alternatives rejected
+## Alternatives rejected / demoted
 
-- **Profile change only (no delete).** Reclaims nothing — Sonarr keeps the
-  above-cutoff UHD file (see Verification).
-- **Grab-then-delete.** Unavailable in vanilla Sonarr (won't grab 1080p while
-  2160p meets cutoff); would need advanced custom-format / downgrade-allowed
-  profiles. Noted as a possible later refinement, not the baseline.
-- **Delete without pre-verifying 1080p availability.** Risks destroying the
-  only copy with no replacement — a non-negotiable precondition.
+- **Profile change only, no search.** Reclaims nothing on its own — a search
+  (auto or triggered) is what runs the upgrade-replace. The executor triggers
+  it.
+- **Delete-first, then re-grab.** The original design here; demoted to a
+  **fallback** only for setups without custom-format profiles (where the
+  resident 2160p can't be out-scored). It reintroduces the no-file window and
+  the never-delete-without-replacement precondition, so it is not the baseline.
+- **Manual-import override.** Not needed — the spike auto-imported. Retained
+  only as a manual recovery path if a specific grab parks in the queue.
 - **Execute from Costanza.** ADR-0011 / ADR-0003: Costanza never touches
-  quality profiles; the destructive Sonarr write is Resolute's.
+  quality profiles; the Sonarr write is Resolute's.
 - **Return `household_score` as evidence.** ADR-0011: double-counts the
   household's live voice and imports storage-pressure circularity. Objective
   lane only.
