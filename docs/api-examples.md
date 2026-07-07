@@ -1,6 +1,6 @@
 # API Examples
 
-Base URL in-cluster: `http://resolute.default.svc.cluster.local:8130`
+Base URL in-cluster: `http://resolute.default.svc.cluster.local:8080`
 
 If `api_token` is configured, every `/api/*` call below (except the webhook,
 which uses its own shared secret) additionally needs
@@ -9,7 +9,7 @@ which uses its own shared secret) additionally needs
 ## Manual decision
 
 ```bash
-curl -s -X POST localhost:8130/api/decisions \
+curl -s -X POST localhost:8080/api/decisions \
   -H 'Content-Type: application/json' \
   -d '{"title": "Severance", "year": 2022, "tmdb_id": 95396, "requester": "alex"}'
 ```
@@ -52,7 +52,7 @@ curl -s -X POST localhost:8130/api/decisions \
 ## Seerr webhook (what Seerr sends)
 
 ```bash
-curl -s -X POST localhost:8130/api/webhooks/seerr \
+curl -s -X POST localhost:8080/api/webhooks/seerr \
   -H 'Content-Type: application/json' \
   -H 'X-Resolute-Token: s3cret' \
   -d @fixtures/seerr/webhook_media_pending.json
@@ -90,7 +90,7 @@ Requires `execute_token` to be configured; while it is empty, HTTP-mediated
 execution is disabled entirely (403) and only the CLI path works.
 
 ```bash
-curl -s -X POST localhost:8130/api/decisions/01KWME0M3H8Y1RZ0Q2W7C9XKPT/execute \
+curl -s -X POST localhost:8080/api/decisions/01KWME0M3H8Y1RZ0Q2W7C9XKPT/execute \
   -H 'Content-Type: application/json' \
   -H 'X-Resolute-Operator-Token: <execute_token>' \
   -d '{"operator": "alex"}'
@@ -113,7 +113,7 @@ resolute execute last --operator alex --yes   # skip confirmation
 ## Scheduled review sweep
 
 ```bash
-curl -s -X POST localhost:8130/api/reviews/pending
+curl -s -X POST localhost:8080/api/reviews/pending
 # -> {"reviewed": 2, "decisions": [
 #      {"seerr_request_id": 123, "decision_id": "01KW...", "title": "Severance",
 #       "final_resolution": "2160p", "confidence": "high"}, ...]}
@@ -123,7 +123,7 @@ curl -s -X POST localhost:8130/api/reviews/pending
 ## Plan from an existing Seerr request
 
 ```bash
-curl -s -X POST localhost:8130/api/seerr/plan \
+curl -s -X POST localhost:8080/api/seerr/plan \
   -H 'Content-Type: application/json' \
   -d '{"seerr_request_id": 123}'
 ```
@@ -131,7 +131,7 @@ curl -s -X POST localhost:8130/api/seerr/plan \
 ## Feedback
 
 ```bash
-curl -s -X POST localhost:8130/api/feedback \
+curl -s -X POST localhost:8080/api/feedback \
   -H 'Content-Type: application/json' \
   -d '{"decision_id": "01KWME0M3H8Y1RZ0Q2W7C9XKPT",
        "verdict": "prefer_1080p", "reason_tag": "background_watch",
@@ -141,7 +141,7 @@ curl -s -X POST localhost:8130/api/feedback \
 ## Sonarr audit
 
 ```bash
-curl -s -X POST localhost:8130/api/sonarr/audit \
+curl -s -X POST localhost:8080/api/sonarr/audit \
   -H 'Content-Type: application/json' \
   -d '{"decision_id": "01KWME0M3H8Y1RZ0Q2W7C9XKPT"}'
 # -> {"series_found": true, "expected_profile": "Ultra-HD",
@@ -151,7 +151,7 @@ curl -s -X POST localhost:8130/api/sonarr/audit \
 ## Calibration summary
 
 ```bash
-curl -s localhost:8130/api/calibration/summary
+curl -s localhost:8080/api/calibration/summary
 # -> {"decisions": 42, "decisions_by_resolution": {"1080p": 30, "2160p": 12},
 #     "feedback": 20, "feedback_by_verdict": {"agree": 17, "prefer_1080p": 3},
 #     "override_reason_tags": {"background_watch": 2, "storage": 1},

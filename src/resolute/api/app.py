@@ -45,6 +45,21 @@ class DecideBody(DecisionRequest):
     mode: AutomationMode | None = None
 
 
+def create_metrics_app(metrics: Counter[str]) -> FastAPI:
+    """Prometheus metrics on a dedicated listener (home-operations org
+    convention: /metrics on 8081, kept off the possibly-exposed main port).
+    Shares the main app's Counter via ``app.state.metrics``."""
+    app = FastAPI(title="resolute-metrics", version=__version__)
+
+    @app.get("/metrics")
+    def metrics_endpoint() -> Response:
+        lines = ["# TYPE resolute_events counter"]
+        lines += [f"resolute_{key} {value}" for key, value in sorted(metrics.items())]
+        return Response("\n".join(lines) + "\n", media_type="text/plain")
+
+    return app
+
+
 def create_app(
     settings: Settings,
     policy: Policy,
@@ -55,6 +70,7 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="resolute", version=__version__)
     metrics: Counter[str] = Counter()
+    app.state.metrics = metrics
 
     if settings.api_token:
         # Gate everything under /api/ except the webhook, which carries its own
@@ -83,12 +99,6 @@ def create_app(
     def readyz() -> dict:
         store.ping()
         return {"status": "ready", "mode": settings.mode}
-
-    @app.get("/metrics")
-    def metrics_endpoint() -> Response:
-        lines = ["# TYPE resolute_events counter"]
-        lines += [f"resolute_{key} {value}" for key, value in sorted(metrics.items())]
-        return Response("\n".join(lines) + "\n", media_type="text/plain")
 
     # -- decisions -----------------------------------------------------------
 

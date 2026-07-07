@@ -73,7 +73,7 @@ if `/config/policy.yaml` is not mounted.
 ## Direct webhook (default shape)
 
 ```text
-Seerr ──POST──> http://resolute.default.svc.cluster.local:8130/api/webhooks/seerr
+Seerr ──POST──> http://resolute.default.svc.cluster.local:8080/api/webhooks/seerr
 ```
 
 In Seerr: Settings -> Notifications -> Webhook:
@@ -123,7 +123,7 @@ this repo deliberately ships no Chaski manifests to avoid guessing them.
 
 ```bash
 docker build -t resolute .
-docker run -p 8130:8130 \
+docker run -p 8080:8080 \
   -v resolute-data:/data \
   -v $(pwd)/config/policy.yaml:/config/policy.yaml:ro \
   -e RESOLUTE_SEERR__URL=http://seerr.local \
@@ -168,7 +168,7 @@ spec:
             matchLabels:
               app.kubernetes.io/name: resolute   # review cronjob
       ports:
-        - port: 8130
+        - port: 8080
 ```
 
 (Adjust labels/CNI specifics to your cluster; not shipped as a manifest to

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from resolute.api.app import create_app
+from resolute.api.app import create_app, create_metrics_app
 from resolute.engine.engine import DecisionEngine
 from resolute.executor import Executor
 from resolute.schemas import AutomationMode
@@ -274,10 +274,11 @@ def test_api_token_gates_decision_endpoints(settings, policy, evidence_source, s
     ok = client.post("/api/decisions", json=body, headers={"X-Resolute-Api-Token": "api-tok"})
     assert ok.status_code == 200
 
-    # probes and metrics stay open
+    # probes stay open on the main port; metrics on its dedicated listener
     assert client.get("/healthz").status_code == 200
     assert client.get("/readyz").status_code == 200
-    assert client.get("/metrics").status_code == 200
+    metrics_client = TestClient(create_metrics_app(client.app.state.metrics))
+    assert metrics_client.get("/metrics").status_code == 200
 
 
 def test_webhook_exempt_from_api_token(
@@ -379,6 +380,7 @@ def test_metrics_exposition(api, webhook_payload):
     client, _, _ = api
     client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
     client.post("/api/webhooks/seerr", json=webhook_payload)
-    text = client.get("/metrics").text
+    metrics_client = TestClient(create_metrics_app(client.app.state.metrics))
+    text = metrics_client.get("/metrics").text
     assert "resolute_decisions_total" in text
     assert "resolute_webhook_decided_total 1" in text
