@@ -384,3 +384,147 @@ def test_metrics_exposition(api, webhook_payload):
     text = metrics_client.get("/metrics").text
     assert "resolute_decisions_total" in text
     assert "resolute_webhook_decided_total 1" in text
+
+
+# -- ADR-0002: objective worth + downgrades ---------------------------------
+
+
+class WorthSeerr(FakeSeerr):
+    """Serves the Severance TV-details fixture (tvdbId 371980) like Seerr would."""
+
+    def __init__(self):
+        super().__init__()
+        from conftest import load_fixture
+
+        self.tv = load_fixture("seerr", "tv_details_severance.json")
+
+    def get_tv_details(self, tmdb_id):
+        if tmdb_id == self.tv["id"]:
+            return self.tv
+        from resolute.seerr.client import SeerrError
+
+        raise SeerrError("not found")
+
+    def search(self, query, page=1):
+        return [
+            {"mediaType": "person", "id": 1},
+            {"mediaType": "tv", "id": self.tv["id"]},
+        ]
+
+
+class WorthSonarr:
+    def get_series_by_tvdb(self, tvdb_id):
+        if tvdb_id == 371980:
+            return {"id": 42, "title": "Severance", "tvdbId": 371980}
+        return None
+
+
+def _worth_client(settings, policy, evidence_source, store):
+    from resolute.api.app import create_app
+    from resolute.engine.engine import DecisionEngine
+
+    engine = DecisionEngine(settings, policy, evidence_source)
+    app = create_app(
+        settings, policy, engine, store, None, seerr=WorthSeerr(), sonarr=WorthSonarr()
+    )
+    return TestClient(app)
+
+
+def test_objective_worth_via_sonarr_title_and_search(
+    settings, policy, evidence_source, store
+):
+    client = _worth_client(settings, policy, evidence_source, store)
+    body = client.get("/api/titles/371980/objective-worth").json()
+    assert body["worth"] == "2160p"
+    assert body["tmdb_id"] == 95396
+    assert body["title"] == "Severance"
+    assert body["objective_score"] > 0
+    assert body["reasons"]
+    # pure read: no decision recorded
+    assert store.list_decisions() == []
+
+
+def test_objective_worth_verifies_tmdb_hint(settings, policy, evidence_source, store):
+    client = _worth_client(settings, policy, evidence_source, store)
+    # correct hint resolves directly
+    ok = client.get("/api/titles/371980/objective-worth?tmdb_id=95396").json()
+    assert ok["worth"] == "2160p"
+    # a hint whose externalIds don't match the tvdb id is rejected, and with
+    # no Sonarr series either the endpoint degrades to unavailable
+    bad = client.get("/api/titles/999/objective-worth?tmdb_id=95396").json()
+    assert bad["worth"] == "unavailable"
+
+
+def test_objective_worth_unavailable_degrades(settings, policy, evidence_source, store):
+    client = _worth_client(settings, policy, evidence_source, store)
+    body = client.get("/api/titles/12345/objective-worth").json()
+    assert body["worth"] == "unavailable"
+    assert "reason" in body
+
+
+def test_downgrade_plan_endpoint_is_read_only(settings, policy, evidence_source, store):
+    from test_downgrade import SERIES, FakeDowngradeSonarr
+    from resolute.api.app import create_app
+    from resolute.engine.engine import DecisionEngine
+
+    engine = DecisionEngine(settings, policy, evidence_source)
+    sonarr = FakeDowngradeSonarr(series=SERIES)
+    client = TestClient(
+        create_app(settings, policy, engine, store, None, seerr=None, sonarr=sonarr)
+    )
+    body = client.post(
+        "/api/downgrades/plan",
+        json={"costanza_decision_id": "cz-9", "tvdb_id": 404171},
+    ).json()
+    assert body["blockers"] == []
+    assert body["estimated_gb_reclaimed"] == 30.0
+    assert sonarr.profile_updates == []
+    assert store.get_downgrade("cz-9") is None
+
+
+def test_downgrade_execute_endpoint_gates(settings, policy, evidence_source, store):
+    from test_downgrade import SERIES, FakeDowngradeSonarr
+    from resolute.api.app import create_app
+    from resolute.engine.engine import DecisionEngine
+
+    settings.execute_token = OPERATOR_TOKEN
+    engine = DecisionEngine(settings, policy, evidence_source)
+    sonarr = FakeDowngradeSonarr(series=SERIES)
+    client = TestClient(
+        create_app(settings, policy, engine, store, None, seerr=None, sonarr=sonarr)
+    )
+    payload = {
+        "operator": "alex",
+        "handoff": {"costanza_decision_id": "cz-9", "tvdb_id": 404171},
+    }
+    # wrong operator token
+    assert (
+        client.post(
+            "/api/downgrades/execute",
+            json=payload,
+            headers={"X-Resolute-Operator-Token": "wrong"},
+        ).status_code
+        == 403
+    )
+    # right token but report-only phase (gates off) -> 409, nothing written
+    response = client.post(
+        "/api/downgrades/execute",
+        json=payload,
+        headers={"X-Resolute-Operator-Token": OPERATOR_TOKEN},
+    )
+    assert response.status_code == 409
+    assert sonarr.profile_updates == []
+
+    # both gates open -> executes and is retrievable
+    settings.allow_writes = True
+    settings.downgrade.admin_confirm_enabled = True
+    response = client.post(
+        "/api/downgrades/execute",
+        json=payload,
+        headers={"X-Resolute-Operator-Token": OPERATOR_TOKEN},
+    )
+    assert response.status_code == 200
+    assert response.json()["executed"] is True
+    assert sonarr.profile_updates == [(42, 6)]
+    assert client.get("/api/downgrades/cz-9").json()["executed"] is True
+    assert client.get("/api/downgrades/nope").status_code == 404

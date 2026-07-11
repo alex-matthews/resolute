@@ -8,6 +8,7 @@ Endpoints verified against the Seerr v3 OpenAPI spec (seerr-team/seerr):
 - GET  /api/v1/service/sonarr               list Sonarr servers
 - GET  /api/v1/service/sonarr/{id}          quality profiles / root folders
 - GET  /api/v1/tv/{tmdbId}                  TV details (TMDB proxy)
+- GET  /api/v1/search?query=                multi search (movies/tv/people)
 """
 
 from __future__ import annotations
@@ -62,6 +63,13 @@ class SeerrClient:
 
     def get_tv_details(self, tmdb_id: int) -> dict:
         return self._get(f"/tv/{tmdb_id}")
+
+    def search(self, query: str, page: int = 1) -> list[dict]:
+        """Multi search; results carry mediaType and the TMDB id. Seerr exposes
+        no external-id lookup, so tvdb->tmdb mapping is search + confirmation
+        against /tv/{tmdbId} externalIds (see metadata.source)."""
+        data = self._get("/search", query=query, page=page)
+        return data.get("results", [])
 
     def list_sonarr_servers(self) -> list[dict]:
         return self._get("/service/sonarr")

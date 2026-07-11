@@ -191,6 +191,44 @@ def execute(
 
 
 @app.command()
+def downgrade(
+    tvdb_id: int = typer.Option(..., "--tvdb-id"),
+    costanza_decision_id: str = typer.Option(..., "--costanza-decision-id"),
+    target_profile: str | None = typer.Option(None, help="Defaults to downgrade.target_profile_name"),
+    execute: bool = typer.Option(False, "--execute", help="Apply the reclaim (default: report only)"),
+    operator: str | None = typer.Option(None, help="Required with --execute"),
+    config: str | None = _config_option,
+) -> None:
+    """ADR-0002 reclaim-to-1080p. Reports by default; --execute requires
+    allow_writes AND downgrade.admin_confirm_enabled (both ship off)."""
+    from .runtime import build_runtime
+    from .sonarr.downgrade import DowngradeBlocked, DowngradeHandoff, execute_downgrade, plan_downgrade
+
+    rt = build_runtime(config)
+    if rt.sonarr is None:
+        typer.echo("sonarr is not configured", err=True)
+        raise typer.Exit(1)
+    handoff = DowngradeHandoff(
+        costanza_decision_id=costanza_decision_id,
+        tvdb_id=tvdb_id,
+        target_profile_name=target_profile,
+    )
+    if not execute:
+        report = plan_downgrade(handoff, rt.settings, rt.sonarr)
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    if not operator:
+        typer.echo("--execute requires --operator", err=True)
+        raise typer.Exit(1)
+    try:
+        report = execute_downgrade(handoff, rt.settings, rt.sonarr, rt.store, operator)
+    except DowngradeBlocked as exc:
+        typer.echo(f"blocked: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(report.model_dump_json(indent=2))
+
+
+@app.command()
 def preflight(config: str | None = _config_option) -> None:
     """Live contract check against Seerr/Sonarr: connectivity, profile resolution,
     pending-request visibility. Read-only; run before enabling any write mode."""
@@ -469,7 +507,9 @@ def serve(
     from .api.app import create_app, create_metrics_app
 
     rt = build_runtime(config)
-    api = create_app(rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr)
+    api = create_app(
+        rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr, rt.sonarr
+    )
     bind_host = host or rt.settings.listen_host
     log_level = rt.settings.log_level.lower()
     configs = [

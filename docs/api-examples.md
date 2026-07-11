@@ -157,3 +157,34 @@ curl -s localhost:8080/api/calibration/summary
 #     "override_reason_tags": {"background_watch": 2, "storage": 1},
 #     "agreement_rate": 0.85}
 ```
+
+## Objective worth (ADR-0002, Costanza evidence read)
+
+```bash
+curl -s localhost:8080/api/titles/371980/objective-worth
+# -> {"tvdb_id": 371980, "tmdb_id": 95396, "title": "Severance",
+#     "worth": "2160p", "objective_score": 3.1, "confidence": "medium",
+#     "reasons": ["genre/keywords suggest strong visual payoff", ...],
+#     "metadata_gaps": []}
+# unresolvable ids degrade instead of erroring:
+# -> {"tvdb_id": 999, "worth": "unavailable", "reason": "..."}
+```
+
+## Downgrade (ADR-0002, report-only by default)
+
+```bash
+# dry-run report: preconditions, resident 2160p, estimated GB reclaimed
+curl -s -X POST localhost:8080/api/downgrades/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"costanza_decision_id": "cz-001", "tvdb_id": 404171}'
+
+# execution additionally requires the operator token AND allow_writes AND
+# downgrade.admin_confirm_enabled (both ship off); exactly-once per decision id
+curl -s -X POST localhost:8080/api/downgrades/execute \
+  -H 'Content-Type: application/json' \
+  -H 'X-Resolute-Operator-Token: <execute_token>' \
+  -d '{"operator": "alex",
+       "handoff": {"costanza_decision_id": "cz-001", "tvdb_id": 404171}}'
+
+curl -s localhost:8080/api/downgrades/cz-001   # the write-ahead audit record
+```

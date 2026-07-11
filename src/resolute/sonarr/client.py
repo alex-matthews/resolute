@@ -36,6 +36,10 @@ class SonarrClient:
     def list_quality_profiles(self) -> list[dict]:
         return self._get("/qualityprofile")
 
+    def get_quality_profile(self, profile_id: int) -> dict:
+        """Full profile including its quality list (ADR-0002 invariant check)."""
+        return self._get(f"/qualityprofile/{profile_id}")
+
     def resolve_profile_id(self, profile_name: str) -> int:
         wanted = profile_name.strip().lower()
         for profile in self.list_quality_profiles():
@@ -53,9 +57,20 @@ class SonarrClient:
     def get_series(self, series_id: int) -> dict:
         return self._get(f"/series/{series_id}")
 
-    # -- fallback write: correct a series profile post-add ----------------
-    # Race note: only safe when no search is in flight. resolute never
-    # triggers a Sonarr search itself, and this path requires operator approval.
+    def list_episode_files(self, series_id: int) -> list[dict]:
+        """Resident files with size and quality (reclaim inventory/estimate)."""
+        return self._get("/episodefile", seriesId=series_id)
+
+    def get_queue_details(self, series_id: int) -> list[dict]:
+        """In-flight grabs/imports for a series (downgrade precondition check)."""
+        return self._get("/queue/details", seriesId=series_id)
+
+    # -- writes ------------------------------------------------------------
+    # Discipline (ADR-0001 + ADR-0002): resolute never deletes files. The
+    # profile write is only safe when no search is in flight, and the *only*
+    # search resolute ever triggers is the downgrade executor's monitored
+    # search (ADR-0002), which drives Sonarr's own import-then-delete
+    # upgrade flow. Both paths are gated far above this client.
 
     def update_series_profile(self, series_id: int, profile_id: int) -> dict:
         series = self.get_series(series_id)
@@ -66,3 +81,16 @@ class SonarrClient:
             return response.json()
         except httpx.HTTPError as exc:
             raise SonarrError(f"PUT /series/{series_id} failed: {exc}") from exc
+
+    def trigger_series_search(self, series_id: int) -> dict:
+        """POST /command SeriesSearch: the ADR-0002 reclaim trigger. Sonarr's
+        normal upgrade flow then grabs an in-profile release, imports it, and
+        deletes the out-of-profile resident (import-then-delete)."""
+        try:
+            response = self._client.post(
+                "/api/v3/command", json={"name": "SeriesSearch", "seriesId": series_id}
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as exc:
+            raise SonarrError(f"POST /command SeriesSearch failed: {exc}") from exc

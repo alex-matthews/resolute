@@ -119,6 +119,21 @@ class SonarrSettings(BaseModel):
     api_key: str = ""
 
 
+class DowngradeSettings(BaseModel):
+    """ADR-0002 downgrade executor. Report-only (dry-run) is always available;
+    actually executing a reclaim requires admin_confirm_enabled *and* the
+    allow_writes master switch. Ships off at every level."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    admin_confirm_enabled: bool = False
+    # Sonarr profile a reclaim targets. Load-bearing invariant (ADR-0002): this
+    # profile must EXCLUDE 2160p from its quality list; the executor verifies.
+    target_profile_name: str = "HD-1080p"
+    # Handoffs whose council decision is older than this are stale and blocked.
+    max_decision_age_days: int = 7
+
+
 class JudgeSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -169,6 +184,7 @@ class Settings(BaseSettings):
     seerr: SeerrSettings = Field(default_factory=SeerrSettings)
     sonarr: SonarrSettings = Field(default_factory=SonarrSettings)
     judge: JudgeSettings = Field(default_factory=JudgeSettings)
+    downgrade: DowngradeSettings = Field(default_factory=DowngradeSettings)
 
     @model_validator(mode="after")
     def _auto_writes_require_webhook_secret(self) -> "Settings":
