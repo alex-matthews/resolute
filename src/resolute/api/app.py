@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 from collections import Counter
@@ -70,6 +71,10 @@ class DecideBody(DecisionRequest):
     mode: AutomationMode | None = None
 
 
+def _token_matches(provided: str | None, expected: str) -> bool:
+    return secrets.compare_digest(provided or "", expected)
+
+
 def create_metrics_app(metrics: Counter[str]) -> FastAPI:
     """Prometheus metrics on a dedicated listener (home-operations org
     convention: /metrics on 8081, kept off the possibly-exposed main port).
@@ -78,8 +83,16 @@ def create_metrics_app(metrics: Counter[str]) -> FastAPI:
 
     @app.get("/metrics")
     def metrics_endpoint() -> Response:
-        lines = ["# TYPE resolute_events counter"]
-        lines += [f"resolute_{key} {value}" for key, value in sorted(metrics.items())]
+        # Proper exposition: one TYPE line per metric family, samples grouped
+        # under it (labels split off the family name).
+        families: dict[str, list[str]] = {}
+        for key, value in sorted(metrics.items()):
+            family = key.split("{", 1)[0]
+            families.setdefault(family, []).append(f"resolute_{key} {value}")
+        lines: list[str] = []
+        for family, samples in families.items():
+            lines.append(f"# TYPE resolute_{family} counter")
+            lines.extend(samples)
         return Response("\n".join(lines) + "\n", media_type="text/plain")
 
     return app
@@ -105,7 +118,9 @@ def create_app(
         async def require_api_token(request: Request, call_next):
             path = request.url.path
             if path.startswith("/api/") and path != "/api/webhooks/seerr":
-                if request.headers.get("X-Resolute-Api-Token") != settings.api_token:
+                if not _token_matches(
+                    request.headers.get("X-Resolute-Api-Token"), settings.api_token
+                ):
                     return JSONResponse({"detail": "invalid api token"}, status_code=401)
             return await call_next(request)
 
@@ -155,7 +170,9 @@ def create_app(
                 "HTTP execution is disabled: set execute_token in config and send it"
                 " as X-Resolute-Operator-Token (or execute via the CLI)",
             )
-        if request.headers.get("X-Resolute-Operator-Token") != settings.execute_token:
+        if not _token_matches(
+            request.headers.get("X-Resolute-Operator-Token"), settings.execute_token
+        ):
             raise HTTPException(403, "invalid operator token")
         decision = store.get_decision(decision_id)
         if decision is None:
@@ -187,10 +204,22 @@ def create_app(
     @app.post("/api/webhooks/seerr")
     async def seerr_webhook(request: Request) -> dict:
         secret = settings.seerr.webhook_shared_secret
-        if secret and request.headers.get("X-Resolute-Token") != secret:
+        if secret and not _token_matches(request.headers.get("X-Resolute-Token"), secret):
             metrics["webhook_unauthorized_total"] += 1
             raise HTTPException(401, "invalid webhook token")
-        payload: dict[str, Any] = await request.json()
+        try:
+            payload: dict[str, Any] = await request.json()
+        except json.JSONDecodeError:
+            raw = (await request.body())[:2000].decode(errors="replace")
+            store.save_webhook_event({"_raw_body": raw}, outcome="invalid: not json")
+            metrics["webhook_invalid_total"] += 1
+            raise HTTPException(400, "webhook body is not valid JSON") from None
+        if not isinstance(payload, dict):
+            store.save_webhook_event(
+                {"_raw_body": str(payload)[:2000]}, outcome="invalid: not an object"
+            )
+            metrics["webhook_invalid_total"] += 1
+            raise HTTPException(422, "webhook body must be a JSON object")
 
         try:
             decision_request = normalize_webhook(

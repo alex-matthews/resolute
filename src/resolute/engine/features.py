@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from ..config import Policy
@@ -40,10 +41,16 @@ def _norm(values: list[str]) -> list[str]:
     return [v.strip().lower() for v in values if v and v.strip()]
 
 
+def _contains_term(item: str, term: str) -> bool:
+    """Whole-word/phrase containment: 'dune' matches 'dune: prophecy' but not
+    'dunedin', and 'max' matches 'hbo max' but not 'cinemax'."""
+    return re.search(rf"(?<!\w){re.escape(term)}(?!\w)", item) is not None
+
+
 def _contains_any(haystack: list[str], needles: list[str]) -> str | None:
     for needle in _norm(needles):
         for item in haystack:
-            if needle in item:
+            if _contains_term(item, needle):
                 return needle
     return None
 
@@ -67,7 +74,10 @@ def extract_features(
 
     title = facts.canonical_title or request.title
     title_lower = (title or "").lower()
-    genre_haystack = genres + keywords + [title_lower]
+    # Genre signal comes from genres/keywords only: a title *containing* a genre
+    # word ("Animation Domination") is not evidence of that genre. Pins are the
+    # deliberate title-matching mechanism.
+    genre_haystack = genres + keywords
 
     features = FeatureSet(
         title=title,
