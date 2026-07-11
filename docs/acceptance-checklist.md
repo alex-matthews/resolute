@@ -20,6 +20,10 @@ From the cleansheet design + handoff. Verification commands assume
       calibration summaries
 - [x] Result is presentable to any human-facing adapter (title, resolution,
       confidence, top reasons, risk flags, feedback options)
+- [x] ADR-0002 Costanza seam: objective-worth read endpoint (pure, degrades to
+      `unavailable`) and reclaim-to-1080p executor (report-only default,
+      admin-confirm gated, write-ahead audited, exactly-once) —
+      `tests/test_downgrade.py`, `tests/test_api.py`
 
 ## Safety
 
@@ -65,7 +69,7 @@ From the cleansheet design + handoff. Verification commands assume
       one engine
 - [x] No-network tests: fixtures, provider abstraction, guardrails, planner,
       audit, engine, store, CLI, API, webhook, wire-level Seerr client, golden
-      cases — `pytest` (113 tests)
+      cases — `pytest` (139 tests)
 - [x] Durable decision/feedback/audit history: SQLite on PVC + JSONL export
 - [x] Dockerfile, local run commands, config examples
       (`config/*.example.yaml`), home-ops manifests (`deploy/kubernetes/`)

@@ -31,7 +31,8 @@ spec:
               RESOLUTE_AUTO_APPROVE_ENABLED: "false"
               RESOLUTE_DB_PATH: /data/resolute.db
               RESOLUTE_POLICY_PATH: /config/policy.yaml
-              RESOLUTE_LISTEN_PORT: &port 8130
+              # Ports follow the config defaults (org convention): app 8080,
+              # /metrics on its own 8081 listener. No override needed.
               RESOLUTE_SEERR__URL: http://seerr.default.svc.cluster.local
               RESOLUTE_SONARR__URL: http://sonarr.default.svc.cluster.local
               RESOLUTE_SEERR__PROFILE_NAME_1080P: HD-1080p   # match your Sonarr profile names exactly
@@ -48,7 +49,7 @@ spec:
                 spec:
                   httpGet:
                     path: /healthz
-                    port: *port
+                    port: &port 8080
                   periodSeconds: 30
               readiness:
                 enabled: true
@@ -90,15 +91,17 @@ spec:
                 if os.environ.get("RESOLUTE_API_TOKEN"):
                     headers["X-Resolute-Api-Token"] = os.environ["RESOLUTE_API_TOKEN"]
                 r = httpx.post(
-                    "http://resolute.default.svc.cluster.local:8130/api/reviews/pending",
+                    "http://resolute.default.svc.cluster.local/api/reviews/pending",
                     headers=headers,
                     timeout=300,
                 )
                 r.raise_for_status()
                 print(r.text)
             envFrom:
+              # Least privilege: the review job only talks to the API, so it
+              # gets only the api token — not the Seerr/Sonarr/judge keys.
               - secretRef:
-                  name: resolute-secret
+                  name: resolute-review-secret
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -115,7 +118,11 @@ spec:
         controller: resolute
         ports:
           http:
-            port: *port
+            port: 80
+            targetPort: *port
+          # Dedicated metrics listener, exposed for the in-cluster scraper.
+          metrics:
+            port: 8081
     # Internal-only: Seerr reaches resolute in-cluster; no external route needed.
     persistence:
       data:

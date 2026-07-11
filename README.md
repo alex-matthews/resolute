@@ -65,7 +65,7 @@ resolute audit-library --limit 50              # shadow-audit Sonarr drift
 
 Settings -> Notifications -> Webhook in Seerr:
 
-- **URL**: `http://resolute.default.svc.cluster.local:8080/api/webhooks/seerr`
+- **URL**: `http://resolute.default.svc.cluster.local/api/webhooks/seerr`
 - **Custom header**: `X-Resolute-Token: <your shared secret>` (matches
   `seerr.webhook_shared_secret`)
 - **Notification types**: enable "Request Pending Approval"
@@ -120,7 +120,11 @@ modes also refuse to start unless the webhook shared secret is configured
 4. **Guardrails** apply hard pins and caps, clamp the judge, and route
    uncertain cases to `hold_for_manual_review`.
 5. **Planner** emits a Seerr-first action plan; Sonarr mutation exists only as
-   an operator-approved fallback plus a read-only audit.
+   an operator-approved fallback plus a read-only audit. A separate,
+   independently-gated retention seam
+   ([docs/adr/0002](docs/adr/0002-downgrade-executor-and-worth-endpoint.md))
+   serves Costanza: an objective-worth read endpoint and a reclaim-to-1080p
+   executor that ships report-only.
 6. **Feedback** (`agree` / `prefer_1080p` / `prefer_2160p` / `manual_review` +
    reason tags) accumulates for the calibration loop
    ([docs/calibration.md](docs/calibration.md)).
@@ -129,7 +133,7 @@ modes also refuse to start unless the webhook shared secret is configured
 
 ```text
 src/resolute/     engine, schemas, seerr/sonarr adapters, judge, store, api, cli
-tests/              113 no-network tests
+tests/              139 no-network tests
 fixtures/           seerr/sonarr payloads, evidence bundles, golden expectations
 config/             config + household policy examples
 deploy/kubernetes/  Flux/app-template manifests (home-ops style)

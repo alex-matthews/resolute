@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import secrets
 from collections import Counter
 from typing import Any
 
@@ -13,11 +15,30 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from .. import __version__
 from ..config import Policy, Settings
 from ..engine.engine import DecisionEngine
+from ..engine.features import extract_features
+from ..engine.policy import prescore
 from ..executor import ExecutionBlocked, ExecutionFailed, Executor
-from ..schemas import AutomationMode, Decision, DecisionRequest, FeedbackIn, Resolution
+from ..metadata.source import facts_from_seerr_tv, resolve_tv_by_tvdb
+from ..schemas import (
+    AutomationMode,
+    Decision,
+    DecisionRequest,
+    EvidenceBundle,
+    FeedbackIn,
+    Resolution,
+)
 from ..seerr.client import SeerrClient, SeerrError
 from ..seerr.webhook import WebhookRejection, normalize_webhook
 from ..sonarr.audit import audit_series_profile
+from ..sonarr.client import SonarrClient, SonarrError
+from ..sonarr.downgrade import (
+    DowngradeBlocked,
+    DowngradeHandoff,
+    DowngradeReport,
+    execute_downgrade,
+    plan_downgrade,
+    reconcile_downgrade,
+)
 from ..store.db import Store
 
 logger = logging.getLogger(__name__)
@@ -41,8 +62,18 @@ class ExecuteRequest(BaseModel):
     operator: str
 
 
+class DowngradeExecuteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operator: str
+    handoff: DowngradeHandoff
+
+
 class DecideBody(DecisionRequest):
     mode: AutomationMode | None = None
+
+
+def _token_matches(provided: str | None, expected: str) -> bool:
+    return secrets.compare_digest(provided or "", expected)
 
 
 def create_metrics_app(metrics: Counter[str]) -> FastAPI:
@@ -53,8 +84,16 @@ def create_metrics_app(metrics: Counter[str]) -> FastAPI:
 
     @app.get("/metrics")
     def metrics_endpoint() -> Response:
-        lines = ["# TYPE resolute_events counter"]
-        lines += [f"resolute_{key} {value}" for key, value in sorted(metrics.items())]
+        # Proper exposition: one TYPE line per metric family, samples grouped
+        # under it (labels split off the family name).
+        families: dict[str, list[str]] = {}
+        for key, value in sorted(metrics.items()):
+            family = key.split("{", 1)[0]
+            families.setdefault(family, []).append(f"resolute_{key} {value}")
+        lines: list[str] = []
+        for family, samples in families.items():
+            lines.append(f"# TYPE resolute_{family} counter")
+            lines.extend(samples)
         return Response("\n".join(lines) + "\n", media_type="text/plain")
 
     return app
@@ -67,6 +106,7 @@ def create_app(
     store: Store,
     executor: Executor | None = None,
     seerr: SeerrClient | None = None,
+    sonarr: SonarrClient | None = None,
 ) -> FastAPI:
     app = FastAPI(title="resolute", version=__version__)
     metrics: Counter[str] = Counter()
@@ -79,7 +119,9 @@ def create_app(
         async def require_api_token(request: Request, call_next):
             path = request.url.path
             if path.startswith("/api/") and path != "/api/webhooks/seerr":
-                if request.headers.get("X-Resolute-Api-Token") != settings.api_token:
+                if not _token_matches(
+                    request.headers.get("X-Resolute-Api-Token"), settings.api_token
+                ):
                     return JSONResponse({"detail": "invalid api token"}, status_code=401)
             return await call_next(request)
 
@@ -129,7 +171,9 @@ def create_app(
                 "HTTP execution is disabled: set execute_token in config and send it"
                 " as X-Resolute-Operator-Token (or execute via the CLI)",
             )
-        if request.headers.get("X-Resolute-Operator-Token") != settings.execute_token:
+        if not _token_matches(
+            request.headers.get("X-Resolute-Operator-Token"), settings.execute_token
+        ):
             raise HTTPException(403, "invalid operator token")
         decision = store.get_decision(decision_id)
         if decision is None:
@@ -161,10 +205,22 @@ def create_app(
     @app.post("/api/webhooks/seerr")
     async def seerr_webhook(request: Request) -> dict:
         secret = settings.seerr.webhook_shared_secret
-        if secret and request.headers.get("X-Resolute-Token") != secret:
+        if secret and not _token_matches(request.headers.get("X-Resolute-Token"), secret):
             metrics["webhook_unauthorized_total"] += 1
             raise HTTPException(401, "invalid webhook token")
-        payload: dict[str, Any] = await request.json()
+        try:
+            payload: dict[str, Any] = await request.json()
+        except json.JSONDecodeError:
+            raw = (await request.body())[:2000].decode(errors="replace")
+            store.save_webhook_event({"_raw_body": raw}, outcome="invalid: not json")
+            metrics["webhook_invalid_total"] += 1
+            raise HTTPException(400, "webhook body is not valid JSON") from None
+        if not isinstance(payload, dict):
+            store.save_webhook_event(
+                {"_raw_body": str(payload)[:2000]}, outcome="invalid: not an object"
+            )
+            metrics["webhook_invalid_total"] += 1
+            raise HTTPException(422, "webhook body must be a JSON object")
 
         try:
             decision_request = normalize_webhook(
@@ -278,6 +334,112 @@ def create_app(
             )
         metrics["reviews_total"] += 1
         return {"reviewed": len(reviewed), "decisions": reviewed}
+
+    # -- objective worth (ADR-0002 evidence read for Costanza) -------------------
+
+    @app.get("/api/titles/{tvdb_id}/objective-worth")
+    def objective_worth(tvdb_id: int, tmdb_id: int | None = None, title: str | None = None) -> dict:
+        """Objective lane only, computed on demand; records no decision.
+        Never the household lane (ADR-0002: the council owns those terms).
+        Degrades to worth=unavailable instead of erroring, so a Costanza case
+        assembles without this evidence rather than blocking on it."""
+        if seerr is None:
+            raise HTTPException(503, "no Seerr client configured")
+
+        tv: dict | None = None
+        if tmdb_id is not None:
+            # Caller-supplied hint: trust but verify against externalIds.
+            try:
+                candidate = seerr.get_tv_details(tmdb_id)
+            except SeerrError:
+                candidate = None
+            if candidate and (candidate.get("externalIds") or {}).get("tvdbId") == tvdb_id:
+                tv = candidate
+        if tv is None:
+            lookup_title = title
+            if lookup_title is None and sonarr is not None:
+                try:
+                    series = sonarr.get_series_by_tvdb(tvdb_id)
+                except SonarrError:
+                    series = None
+                if series:
+                    lookup_title = series.get("title")
+            if lookup_title:
+                tv = resolve_tv_by_tvdb(seerr, tvdb_id, lookup_title)
+
+        if tv is None:
+            metrics["worth_unavailable_total"] += 1
+            return {
+                "tvdb_id": tvdb_id,
+                "worth": "unavailable",
+                "reason": "could not resolve confirmed TMDB metadata for this tvdb id",
+            }
+
+        facts = facts_from_seerr_tv(tv)
+        bundle = EvidenceBundle(facts=facts, sources=[f"seerr:/tv/{facts.tmdb_id}"])
+        features = extract_features(DecisionRequest(tvdb_id=tvdb_id), bundle, policy)
+        pre = prescore(features, policy)
+        metrics["worth_total"] += 1
+        return {
+            "tvdb_id": tvdb_id,
+            "tmdb_id": facts.tmdb_id,
+            "title": facts.canonical_title,
+            "worth": pre.objective.resolution,
+            "objective_score": pre.objective_score,
+            "confidence": pre.objective.confidence,
+            "reasons": pre.objective.reasons,
+            "metadata_gaps": features.metadata_gaps,
+        }
+
+    # -- downgrades (ADR-0002 executor: report-only default) ---------------------
+
+    @app.post("/api/downgrades/plan")
+    def downgrade_plan(handoff: DowngradeHandoff) -> DowngradeReport:
+        """Dry-run reclaim report: preconditions, resident 2160p, estimated GB.
+        Read-only against Sonarr; stores nothing."""
+        if sonarr is None:
+            raise HTTPException(503, "no Sonarr client configured")
+        report = plan_downgrade(handoff, settings, sonarr)
+        metrics["downgrade_reports_total"] += 1
+        return report
+
+    @app.post("/api/downgrades/execute")
+    def downgrade_execute(body: DowngradeExecuteRequest, request: Request) -> DowngradeReport:
+        """Admin-confirm reclaim. Requires the operator token plus BOTH
+        allow_writes and downgrade.admin_confirm_enabled (ships off)."""
+        if sonarr is None:
+            raise HTTPException(503, "no Sonarr client configured")
+        if not settings.execute_token:
+            raise HTTPException(
+                403,
+                "HTTP execution is disabled: set execute_token in config and send it"
+                " as X-Resolute-Operator-Token",
+            )
+        if not _token_matches(
+            request.headers.get("X-Resolute-Operator-Token"), settings.execute_token
+        ):
+            raise HTTPException(403, "invalid operator token")
+        try:
+            report = execute_downgrade(body.handoff, settings, sonarr, store, body.operator)
+        except DowngradeBlocked as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except SonarrError as exc:
+            metrics["downgrade_failures_total"] += 1
+            raise HTTPException(502, f"downgrade failed mid-plan: {exc}") from exc
+        metrics["downgrade_executions_total"] += 1
+        return report
+
+    @app.get("/api/downgrades/{costanza_decision_id}")
+    def downgrade_get(costanza_decision_id: str) -> dict:
+        """The audit record plus, when Sonarr is reachable, a live
+        reconciliation of the reclaim's actual outcome (ADR-0002 records the
+        outcome by reconciliation on read, not a blocking grab->import monitor)."""
+        record = store.get_downgrade(costanza_decision_id)
+        if record is None:
+            raise HTTPException(404, "no downgrade recorded for that decision id")
+        if sonarr is not None and (record.get("report") or {}).get("series_id"):
+            record["reconciliation"] = reconcile_downgrade(record["report"], sonarr)
+        return record
 
     # -- planning / audit --------------------------------------------------------
 
