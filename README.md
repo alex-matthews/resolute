@@ -65,7 +65,7 @@ resolute audit-library --limit 50              # shadow-audit Sonarr drift
 
 Settings -> Notifications -> Webhook in Seerr:
 
-- **URL**: `http://resolute.default.svc.cluster.local:8080/api/webhooks/seerr`
+- **URL**: `http://resolute.default.svc.cluster.local/api/webhooks/seerr`
 - **Custom header**: `X-Resolute-Token: <your shared secret>` (matches
   `seerr.webhook_shared_secret`)
 - **Notification types**: enable "Request Pending Approval"
