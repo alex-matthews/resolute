@@ -1,6 +1,14 @@
 # ADR 0002: Downgrade executor and objective-worth endpoint
 
-Status: accepted
+Status: accepted — implemented 2026-07-11 (worth endpoint; executor at
+report-only with the admin-confirm flag shipping off; capped-auto not
+built). Two implementation choices to note against the text below: the
+executor records the reclaim outcome by **reconciliation on read**
+(`GET /api/downgrades/{id}` compares live Sonarr state to the plan
+baseline) rather than a blocking grab→import monitor, and exactly-once
+means one *successful* execution — an interrupted attempt leaves a
+truthful step-state audit row and a retry **resumes** the remaining
+idempotent steps instead of being refused.
 Date: 2026-07-07
 
 Companion to Costanza **ADR-0011** (the cross-system authority: the council
@@ -91,14 +99,14 @@ Sonarr's own upgrade flow, not a hand-rolled delete. Triggered by a Costanza
 `downgrade` handoff carrying the decision id + `tvdb_id` (+ target profile).
 Sequence:
 
-1. **Preconditions** (any failure ⇒ `ExecutionBlocked`, reported, no writes):
-   the title carries a Costanza protection; the target profile still lists
-   2160p (a misconfiguration for reclaim — leaves the resident in-profile;
-   the executor verifies the profile *excludes* 2160p); the series is airing or
-   has episodes queued/downloading; the decision is stale;
-   `RESOLUTE_ALLOW_WRITES=false`. Note: *no 1080p available* is **not** a
-   blocker — Sonarr deletes only on import, so the 2160p is retained and the
-   run simply reports zero reclaim.
+1. **Preconditions** — execution refuses (blocked, reported, no writes) when
+   any of these holds: the title carries a Costanza protection; the target
+   profile still lists 2160p (a misconfiguration for reclaim — leaves the
+   resident in-profile; the executor verifies the profile *excludes* 2160p);
+   the series is airing or has episodes queued/downloading; the decision is
+   stale; `RESOLUTE_ALLOW_WRITES=false`. Note: *no 1080p available* is
+   **not** a blocker — Sonarr deletes only on import, so the 2160p is
+   retained and the run simply reports zero reclaim.
 2. **Write-ahead audit** row (target profile, resident files, expected
    reclaim, Costanza decision id), UNIQUE per decision, before any write.
 3. **Reclaim:** `update_series_profile` → the 1080p-target profile, then

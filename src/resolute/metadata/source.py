@@ -71,6 +71,35 @@ def seerr_request_state_from_api(req: dict) -> SeerrRequestState:
     )
 
 
+def resolve_tv_by_tvdb(
+    seerr: SeerrClient, tvdb_id: int, title: str, max_candidates: int = 5
+) -> dict | None:
+    """Map a Sonarr-native tvdb_id to Seerr TV details (ADR-0002 worth endpoint).
+
+    Seerr has no external-id lookup, so this searches by title and *confirms*
+    each TV candidate by fetching /tv/{tmdbId} and matching externalIds.tvdbId.
+    A wrong search hit can therefore never be scored: no confirmation, no facts.
+    """
+    try:
+        results = seerr.search(title)
+    except SeerrError as exc:
+        logger.warning("seerr search for tvdb %s failed: %s", tvdb_id, exc)
+        return None
+    candidates = [r for r in results if r.get("mediaType") == "tv"][:max_candidates]
+    for candidate in candidates:
+        tmdb_id = candidate.get("id")
+        if tmdb_id is None:
+            continue
+        try:
+            tv = seerr.get_tv_details(tmdb_id)
+        except SeerrError as exc:
+            logger.warning("seerr tv details for candidate %s failed: %s", tmdb_id, exc)
+            continue
+        if (tv.get("externalIds") or {}).get("tvdbId") == tvdb_id:
+            return tv
+    return None
+
+
 class LiveEvidenceSource:
     def __init__(self, seerr: SeerrClient, sonarr: SonarrClient | None = None) -> None:
         self._seerr = seerr

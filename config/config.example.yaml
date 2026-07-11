@@ -56,3 +56,11 @@ judge:
   model: claude-haiku-4-5
   timeout_seconds: 30
   judge_ambiguous_only: true  # only consult the model inside the ambiguous score band
+
+# ADR-0002 downgrade executor (Costanza retention seam). Report-only until
+# admin_confirm_enabled AND allow_writes are both true.
+downgrade:
+  admin_confirm_enabled: false
+  # Must be a profile whose quality list EXCLUDES 2160p (the executor verifies).
+  target_profile_name: "HD-1080p"
+  max_decision_age_days: 7
