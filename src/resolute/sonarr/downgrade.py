@@ -77,9 +77,18 @@ def profile_allows_resolution(profile: dict, resolution: int) -> bool:
 
 
 def plan_downgrade(
-    handoff: DowngradeHandoff, settings: Settings, sonarr: SonarrClient
+    handoff: DowngradeHandoff,
+    settings: Settings,
+    sonarr: SonarrClient,
+    *,
+    resuming: bool = False,
 ) -> DowngradeReport:
-    """Assemble the reclaim plan and every ADR-0002 precondition. Read-only."""
+    """Assemble the reclaim plan and every ADR-0002 precondition. Read-only.
+
+    `resuming=True` relaxes exactly the two blockers that are *evidence of
+    partial progress* from an earlier interrupted attempt (already on the
+    target profile; items queued): the remaining actions are idempotent, so
+    resuming past them is safe. Every other blocker still blocks."""
     target_name = handoff.target_profile_name or settings.downgrade.target_profile_name
     report = DowngradeReport(
         costanza_decision_id=handoff.costanza_decision_id,
@@ -133,14 +142,22 @@ def plan_downgrade(
     if report.target_profile_id is not None and (
         report.current_profile_id == report.target_profile_id
     ):
-        report.blockers.append("series is already on the target profile")
+        if resuming:
+            report.notes.append("series already on the target profile (partial progress)")
+        else:
+            report.blockers.append("series is already on the target profile")
 
     try:
         queue = sonarr.get_queue_details(report.series_id)
         if queue:
-            report.blockers.append(
-                f"{len(queue)} item(s) queued/downloading for this series"
-            )
+            if resuming:
+                report.notes.append(
+                    f"{len(queue)} item(s) queued for this series (reclaim may be in flight)"
+                )
+            else:
+                report.blockers.append(
+                    f"{len(queue)} item(s) queued/downloading for this series"
+                )
     except SonarrError as exc:
         report.blockers.append(f"queue state unavailable: {exc}")
 
@@ -178,11 +195,27 @@ def execute_downgrade(
 ) -> DowngradeReport:
     """Apply the reclaim: write-ahead audit row, profile set, monitored search.
 
-    Raises DowngradeBlocked on any precondition failure, disabled gate, or a
-    duplicate Costanza decision id (exactly-once). Sonarr performs the actual
-    replacement (and deletion) through its ordinary upgrade flow.
+    Exactly-once means at most one *successful* execution per Costanza
+    decision id: a completed row refuses re-runs, while an interrupted
+    attempt (row present, executed=0) is *resumed* — both Sonarr steps are
+    idempotent (re-setting the same profile and re-triggering a search are
+    harmless), and each step is recorded on the row as it completes, so the
+    audit row always reflects what actually happened downstream.
+
+    Raises DowngradeBlocked on any precondition failure or disabled gate;
+    Sonarr performs the actual replacement (and deletion) through its
+    ordinary upgrade flow.
     """
-    report = plan_downgrade(handoff, settings, sonarr)
+    decision_id = handoff.costanza_decision_id
+    existing = store.get_downgrade(decision_id)
+    if existing and existing["executed"]:
+        raise DowngradeBlocked(
+            f"downgrade for Costanza decision {decision_id} already executed;"
+            " refusing to run twice"
+        )
+    resuming = existing is not None
+
+    report = plan_downgrade(handoff, settings, sonarr, resuming=resuming)
     if report.blockers:
         raise DowngradeBlocked("; ".join(report.blockers))
     if not settings.allow_writes:
@@ -192,20 +225,70 @@ def execute_downgrade(
             "downgrade.admin_confirm_enabled is false: report-only phase"
         )
 
+    if resuming:
+        report.notes.append(
+            "resuming an interrupted execution; completed steps so far: "
+            + (", ".join(existing["steps"]) or "none")
+        )
     # Write-ahead audit: the row lands (UNIQUE per Costanza decision) before
-    # any Sonarr write, so a crash mid-execution is visible and re-runs refuse.
-    if not store.save_downgrade(report, operator=operator):
+    # any Sonarr write. A concurrent duplicate insert loses the race and refuses.
+    elif not store.save_downgrade(report, operator=operator):
         raise DowngradeBlocked(
-            f"downgrade for Costanza decision {handoff.costanza_decision_id} "
-            "already recorded; refusing to run twice"
+            f"downgrade for Costanza decision {decision_id} was recorded "
+            "concurrently; refusing to run twice"
         )
 
     sonarr.update_series_profile(report.series_id, report.target_profile_id)
+    store.mark_downgrade_step(decision_id, "profile_set")
     sonarr.trigger_series_search(report.series_id)
+    store.mark_downgrade_step(decision_id, "search_triggered")
     report.executed = True
     report.notes.append(
-        "profile set and monitored search triggered; Sonarr's upgrade flow "
-        "imports 1080p then deletes the out-of-profile 2160p"
+        "profile set and search triggered; Sonarr's upgrade flow imports "
+        "1080p then deletes the out-of-profile 2160p"
     )
-    store.mark_downgrade_executed(handoff.costanza_decision_id, report)
+    store.mark_downgrade_executed(decision_id, report)
     return report
+
+
+def reconcile_downgrade(report: dict, sonarr: SonarrClient) -> dict:
+    """Live outcome check for an executed (or interrupted) downgrade: compare
+    current Sonarr state against the plan baseline. ADR-0002's outcome
+    recording happens here, on read, rather than via a blocking monitor —
+    Sonarr's grab->import runs on its own schedule.
+    """
+    series_id = report.get("series_id")
+    baseline_bytes = int(report.get("resident_uhd_bytes") or 0)
+    try:
+        series = sonarr.get_series(series_id)
+        queue = sonarr.get_queue_details(series_id)
+        files = sonarr.list_episode_files(series_id)
+    except SonarrError as exc:
+        return {"outcome": "unknown", "error": str(exc)}
+
+    uhd = [
+        f
+        for f in files
+        if ((f.get("quality") or {}).get("quality") or {}).get("resolution")
+        == _UHD_RESOLUTION
+    ]
+    remaining_bytes = sum(int(f.get("size") or 0) for f in uhd)
+    on_target = series.get("qualityProfileId") == report.get("target_profile_id")
+    if not on_target:
+        outcome = "profile_not_on_target"
+    elif not uhd:
+        outcome = "complete"
+    elif queue:
+        outcome = "in_progress"
+    else:
+        # Profile applied, nothing in flight, 2160p still resident: waiting on
+        # a grabbable 1080p (per ADR-0002 the resident is simply retained).
+        outcome = "pending"
+    return {
+        "outcome": outcome,
+        "profile_on_target": on_target,
+        "uhd_files_remaining": len(uhd),
+        "uhd_bytes_remaining": remaining_bytes,
+        "gb_freed_so_far": round(max(0, baseline_bytes - remaining_bytes) / _GB, 1),
+        "queue_items": len(queue),
+    }

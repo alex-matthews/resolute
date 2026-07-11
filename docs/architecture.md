@@ -93,8 +93,11 @@ Two surfaces exist for the retention council, both off the request-time path:
   Plan is read-only and always available; execute requires the operator
   token **and** `allow_writes` **and** `downgrade.admin_confirm_enabled`
   (both ship off), and is exactly-once per Costanza decision id via a
-  write-ahead audit row. The reclaim itself is Sonarr's own
-  import-then-delete upgrade flow; resolute still deletes nothing.
+  write-ahead audit row that records each Sonarr step as it completes —
+  an interrupted attempt resumes its remaining idempotent steps on retry,
+  and `GET /api/downgrades/{id}` reconciles the actual outcome against
+  live Sonarr state. The reclaim itself is Sonarr's own import-then-delete
+  upgrade flow; resolute still deletes nothing.
 
 ## Write safety
 

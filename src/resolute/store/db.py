@@ -79,7 +79,9 @@ CREATE TABLE IF NOT EXISTS executions (
 );
 
 -- ADR-0002 write-ahead audit: one row per Costanza downgrade decision,
--- inserted BEFORE any Sonarr write. UNIQUE makes execution exactly-once.
+-- inserted BEFORE any Sonarr write. UNIQUE + executed makes execution
+-- exactly-once per *successful* run; per-step flags keep the row truthful
+-- when an attempt is interrupted mid-plan (and allow idempotent resume).
 CREATE TABLE IF NOT EXISTS downgrades (
     downgrade_id TEXT PRIMARY KEY,
     costanza_decision_id TEXT NOT NULL UNIQUE,
@@ -89,6 +91,8 @@ CREATE TABLE IF NOT EXISTS downgrades (
     target_profile TEXT,
     estimated_gb_reclaimed REAL,
     operator TEXT,
+    profile_set INTEGER NOT NULL DEFAULT 0,
+    search_triggered INTEGER NOT NULL DEFAULT 0,
     executed INTEGER NOT NULL DEFAULT 0,
     payload TEXT NOT NULL
 );
@@ -289,6 +293,20 @@ class Store:
                 return False
         return True
 
+    _DOWNGRADE_STEPS = ("profile_set", "search_triggered")
+
+    def mark_downgrade_step(self, costanza_decision_id: str, step: str) -> None:
+        """Record a completed Sonarr step as it happens, so an interrupted
+        attempt leaves a row that tells the truth about downstream state."""
+        if step not in self._DOWNGRADE_STEPS:
+            raise ValueError(f"unknown downgrade step '{step}'")
+        with self._lock:
+            self._conn.execute(
+                f"UPDATE downgrades SET {step}=1 WHERE costanza_decision_id=?",
+                (costanza_decision_id,),
+            )
+            self._conn.commit()
+
     def mark_downgrade_executed(self, costanza_decision_id: str, report) -> None:
         with self._lock:
             self._conn.execute(
@@ -300,17 +318,21 @@ class Store:
     def get_downgrade(self, costanza_decision_id: str) -> dict | None:
         with self._lock:
             row = self._conn.execute(
-                "SELECT created_at, operator, executed, payload FROM downgrades"
-                " WHERE costanza_decision_id=?",
+                "SELECT created_at, operator, executed, profile_set, search_triggered,"
+                " payload FROM downgrades WHERE costanza_decision_id=?",
                 (costanza_decision_id,),
             ).fetchone()
         if row is None:
             return None
+        steps = [
+            step for step, done in zip(self._DOWNGRADE_STEPS, (row[3], row[4])) if done
+        ]
         return {
             "created_at": row[0],
             "operator": row[1],
             "executed": bool(row[2]),
-            "report": json.loads(row[3]),
+            "steps": steps,
+            "report": json.loads(row[5]),
         }
 
     # -- calibration ---------------------------------------------------------

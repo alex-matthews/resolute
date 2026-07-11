@@ -186,5 +186,10 @@ curl -s -X POST localhost:8080/api/downgrades/execute \
   -d '{"operator": "alex",
        "handoff": {"costanza_decision_id": "cz-001", "tvdb_id": 404171}}'
 
-curl -s localhost:8080/api/downgrades/cz-001   # the write-ahead audit record
+# the write-ahead audit record (per-step state) plus a live reconciliation of
+# the reclaim's actual outcome against current Sonarr state
+curl -s localhost:8080/api/downgrades/cz-001
+# -> {"executed": true, "steps": ["profile_set", "search_triggered"], ...,
+#     "reconciliation": {"outcome": "complete", "gb_freed_so_far": 30.0,
+#                        "uhd_files_remaining": 0, "queue_items": 0, ...}}
 ```

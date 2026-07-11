@@ -1,7 +1,14 @@
 # ADR 0002: Downgrade executor and objective-worth endpoint
 
 Status: accepted — implemented 2026-07-11 (worth endpoint; executor at
-report-only, admin-confirm flag ships off; capped-auto not built)
+report-only with the admin-confirm flag shipping off; capped-auto not
+built). Two implementation choices to note against the text below: the
+executor records the reclaim outcome by **reconciliation on read**
+(`GET /api/downgrades/{id}` compares live Sonarr state to the plan
+baseline) rather than a blocking grab→import monitor, and exactly-once
+means one *successful* execution — an interrupted attempt leaves a
+truthful step-state audit row and a retry **resumes** the remaining
+idempotent steps instead of being refused.
 Date: 2026-07-07
 
 Companion to Costanza **ADR-0011** (the cross-system authority: the council

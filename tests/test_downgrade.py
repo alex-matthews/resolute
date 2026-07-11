@@ -43,17 +43,24 @@ class FakeDowngradeSonarr:
         series: dict | None = None,
         queue: list | None = None,
         files: list | None = None,
+        fail_profile_writes: int = 0,
+        fail_search_triggers: int = 0,
     ):
-        self.series = series
+        self.series = dict(series) if series else None
         self.queue = queue or []
         self.files = files if files is not None else [
             {"id": 1, "size": 30 * 1024**3, "quality": {"quality": {"resolution": 2160}}},
             {"id": 2, "size": 4 * 1024**3, "quality": {"quality": {"resolution": 1080}}},
         ]
+        self.fail_profile_writes = fail_profile_writes
+        self.fail_search_triggers = fail_search_triggers
         self.profile_updates: list[tuple] = []
         self.searches: list[int] = []
 
     def get_series_by_tvdb(self, tvdb_id):
+        return self.series
+
+    def get_series(self, series_id):
         return self.series
 
     def resolve_profile_id(self, name):
@@ -69,10 +76,21 @@ class FakeDowngradeSonarr:
         return self.files
 
     def update_series_profile(self, series_id, profile_id):
+        from resolute.sonarr.client import SonarrError
+
+        if self.fail_profile_writes > 0:
+            self.fail_profile_writes -= 1
+            raise SonarrError("sonarr profile write blipped")
         self.profile_updates.append((series_id, profile_id))
+        self.series["qualityProfileId"] = profile_id
         return {}
 
     def trigger_series_search(self, series_id):
+        from resolute.sonarr.client import SonarrError
+
+        if self.fail_search_triggers > 0:
+            self.fail_search_triggers -= 1
+            raise SonarrError("sonarr command endpoint blipped")
         self.searches.append(series_id)
         return {}
 
@@ -193,3 +211,79 @@ def test_blocked_plan_never_writes(dg_settings, store):
         execute_downgrade(handoff(), dg_settings, sonarr, store, "alex")
     assert sonarr.profile_updates == []
     assert store.get_downgrade("cz-001") is None
+
+
+def test_interrupted_search_trigger_resumes_idempotently(dg_settings, store):
+    """The reviewer-found failure path: profile write lands, search trigger
+    fails. The row must tell the truth (profile_set, not executed) and a
+    retry must resume rather than refuse."""
+    from resolute.sonarr.client import SonarrError
+
+    dg_settings.allow_writes = True
+    dg_settings.downgrade.admin_confirm_enabled = True
+    sonarr = FakeDowngradeSonarr(series=SERIES, fail_search_triggers=1)
+
+    with pytest.raises(SonarrError):
+        execute_downgrade(handoff(), dg_settings, sonarr, store, "alex")
+    record = store.get_downgrade("cz-001")
+    assert record["executed"] is False
+    assert record["steps"] == ["profile_set"]  # row reflects downstream reality
+    assert sonarr.profile_updates == [(42, 6)]
+    assert sonarr.searches == []
+
+    report = execute_downgrade(handoff(), dg_settings, sonarr, store, "alex")
+    assert report.executed is True
+    assert any("resuming" in n for n in report.notes)
+    assert sonarr.searches == [42]
+    record = store.get_downgrade("cz-001")
+    assert record["executed"] is True
+    assert record["steps"] == ["profile_set", "search_triggered"]
+
+
+def test_transient_failure_before_any_write_is_retryable(dg_settings, store):
+    """A Sonarr blip on the profile write itself must not permanently burn
+    the Costanza decision id."""
+    from resolute.sonarr.client import SonarrError
+
+    dg_settings.allow_writes = True
+    dg_settings.downgrade.admin_confirm_enabled = True
+    sonarr = FakeDowngradeSonarr(series=SERIES, fail_profile_writes=1)
+
+    with pytest.raises(SonarrError):
+        execute_downgrade(handoff(), dg_settings, sonarr, store, "alex")
+    record = store.get_downgrade("cz-001")
+    assert record["steps"] == []  # nothing reached Sonarr
+
+    report = execute_downgrade(handoff(), dg_settings, sonarr, store, "alex")
+    assert report.executed is True
+    assert sonarr.profile_updates == [(42, 6)]
+
+
+def test_reconcile_downgrade_outcomes(dg_settings, store):
+    from resolute.sonarr.downgrade import reconcile_downgrade
+
+    dg_settings.allow_writes = True
+    dg_settings.downgrade.admin_confirm_enabled = True
+    sonarr = FakeDowngradeSonarr(series=SERIES)
+    execute_downgrade(handoff(), dg_settings, sonarr, store, "alex")
+    plan = store.get_downgrade("cz-001")["report"]
+
+    # profile applied, 2160p still resident, nothing queued -> pending
+    assert reconcile_downgrade(plan, sonarr)["outcome"] == "pending"
+
+    sonarr.queue = [{"id": 1}]
+    assert reconcile_downgrade(plan, sonarr)["outcome"] == "in_progress"
+
+    # Sonarr's upgrade flow replaced the file: reclaim complete
+    sonarr.queue = []
+    sonarr.files = [
+        {"id": 3, "size": 4 * 1024**3, "quality": {"quality": {"resolution": 1080}}}
+    ]
+    result = reconcile_downgrade(plan, sonarr)
+    assert result["outcome"] == "complete"
+    assert result["gb_freed_so_far"] == 30.0
+    assert result["uhd_files_remaining"] == 0
+
+    # someone reverted the profile out-of-band
+    sonarr.series["qualityProfileId"] = 5
+    assert reconcile_downgrade(plan, sonarr)["outcome"] == "profile_not_on_target"

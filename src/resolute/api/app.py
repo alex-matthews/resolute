@@ -37,6 +37,7 @@ from ..sonarr.downgrade import (
     DowngradeReport,
     execute_downgrade,
     plan_downgrade,
+    reconcile_downgrade,
 )
 from ..store.db import Store
 
@@ -414,8 +415,8 @@ def create_app(
                 "HTTP execution is disabled: set execute_token in config and send it"
                 " as X-Resolute-Operator-Token",
             )
-        if not secrets.compare_digest(
-            request.headers.get("X-Resolute-Operator-Token") or "", settings.execute_token
+        if not _token_matches(
+            request.headers.get("X-Resolute-Operator-Token"), settings.execute_token
         ):
             raise HTTPException(403, "invalid operator token")
         try:
@@ -430,9 +431,14 @@ def create_app(
 
     @app.get("/api/downgrades/{costanza_decision_id}")
     def downgrade_get(costanza_decision_id: str) -> dict:
+        """The audit record plus, when Sonarr is reachable, a live
+        reconciliation of the reclaim's actual outcome (ADR-0002 records the
+        outcome by reconciliation on read, not a blocking grab->import monitor)."""
         record = store.get_downgrade(costanza_decision_id)
         if record is None:
             raise HTTPException(404, "no downgrade recorded for that decision id")
+        if sonarr is not None and (record.get("report") or {}).get("series_id"):
+            record["reconciliation"] = reconcile_downgrade(record["report"], sonarr)
         return record
 
     # -- planning / audit --------------------------------------------------------

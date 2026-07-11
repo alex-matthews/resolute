@@ -526,5 +526,9 @@ def test_downgrade_execute_endpoint_gates(settings, policy, evidence_source, sto
     assert response.status_code == 200
     assert response.json()["executed"] is True
     assert sonarr.profile_updates == [(42, 6)]
-    assert client.get("/api/downgrades/cz-9").json()["executed"] is True
+    record = client.get("/api/downgrades/cz-9").json()
+    assert record["executed"] is True
+    assert record["steps"] == ["profile_set", "search_triggered"]
+    # live reconciliation: profile on target, 2160p resident, nothing queued
+    assert record["reconciliation"]["outcome"] == "pending"
     assert client.get("/api/downgrades/nope").status_code == 404
