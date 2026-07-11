@@ -77,6 +77,25 @@ CREATE TABLE IF NOT EXISTS executions (
     actions TEXT NOT NULL,
     operator TEXT
 );
+
+-- ADR-0002 write-ahead audit: one row per Costanza downgrade decision,
+-- inserted BEFORE any Sonarr write. UNIQUE + executed makes execution
+-- exactly-once per *successful* run; per-step flags keep the row truthful
+-- when an attempt is interrupted mid-plan (and allow idempotent resume).
+CREATE TABLE IF NOT EXISTS downgrades (
+    downgrade_id TEXT PRIMARY KEY,
+    costanza_decision_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    tvdb_id INTEGER NOT NULL,
+    series_id INTEGER,
+    target_profile TEXT,
+    estimated_gb_reclaimed REAL,
+    operator TEXT,
+    profile_set INTEGER NOT NULL DEFAULT 0,
+    search_triggered INTEGER NOT NULL DEFAULT 0,
+    executed INTEGER NOT NULL DEFAULT 0,
+    payload TEXT NOT NULL
+);
 """
 
 
@@ -244,6 +263,77 @@ class Store:
             )
             self._conn.commit()
         return event_id
+
+    # -- downgrades (ADR-0002) -------------------------------------------------
+
+    def save_downgrade(self, report, operator: str | None = None) -> bool:
+        """Write-ahead audit row. Returns False if this Costanza decision id
+        already has a row (the exactly-once refusal), True on insert."""
+        with self._lock:
+            try:
+                self._conn.execute(
+                    "INSERT INTO downgrades (downgrade_id, costanza_decision_id,"
+                    " created_at, tvdb_id, series_id, target_profile,"
+                    " estimated_gb_reclaimed, operator, executed, payload)"
+                    " VALUES (?,?,?,?,?,?,?,?,0,?)",
+                    (
+                        new_id(),
+                        report.costanza_decision_id,
+                        _now(),
+                        report.tvdb_id,
+                        report.series_id,
+                        report.target_profile_name,
+                        report.estimated_gb_reclaimed,
+                        operator,
+                        report.model_dump_json(),
+                    ),
+                )
+                self._conn.commit()
+            except sqlite3.IntegrityError:
+                return False
+        return True
+
+    _DOWNGRADE_STEPS = ("profile_set", "search_triggered")
+
+    def mark_downgrade_step(self, costanza_decision_id: str, step: str) -> None:
+        """Record a completed Sonarr step as it happens, so an interrupted
+        attempt leaves a row that tells the truth about downstream state."""
+        if step not in self._DOWNGRADE_STEPS:
+            raise ValueError(f"unknown downgrade step '{step}'")
+        with self._lock:
+            self._conn.execute(
+                f"UPDATE downgrades SET {step}=1 WHERE costanza_decision_id=?",
+                (costanza_decision_id,),
+            )
+            self._conn.commit()
+
+    def mark_downgrade_executed(self, costanza_decision_id: str, report) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE downgrades SET executed=1, payload=? WHERE costanza_decision_id=?",
+                (report.model_dump_json(), costanza_decision_id),
+            )
+            self._conn.commit()
+
+    def get_downgrade(self, costanza_decision_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT created_at, operator, executed, profile_set, search_triggered,"
+                " payload FROM downgrades WHERE costanza_decision_id=?",
+                (costanza_decision_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        steps = [
+            step for step, done in zip(self._DOWNGRADE_STEPS, (row[3], row[4])) if done
+        ]
+        return {
+            "created_at": row[0],
+            "operator": row[1],
+            "executed": bool(row[2]),
+            "steps": steps,
+            "report": json.loads(row[5]),
+        }
 
     # -- calibration ---------------------------------------------------------
 

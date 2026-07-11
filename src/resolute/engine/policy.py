@@ -16,7 +16,8 @@ _PRE_HD_YEAR = 2005
 class PreScore:
     objective: Recommendation
     household: Recommendation
-    score: float
+    score: float  # household lane; drives thresholds and the ambiguity band
+    objective_score: float = 0.0  # objective lane only (ADR-0002 worth endpoint)
     components: list[ScoreComponent] = field(default_factory=list)
     ambiguous: bool = False
 
@@ -191,6 +192,7 @@ def prescore(features: FeatureSet, policy: Policy) -> PreScore:
         objective=objective,
         household=household,
         score=round(household_score, 3),
+        objective_score=round(objective_score, 3),
         components=objective_parts + household_parts,
         ambiguous=t.hd_score < household_score < t.uhd_score,
     )

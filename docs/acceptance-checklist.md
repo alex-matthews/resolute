@@ -20,6 +20,10 @@ From the cleansheet design + handoff. Verification commands assume
       calibration summaries
 - [x] Result is presentable to any human-facing adapter (title, resolution,
       confidence, top reasons, risk flags, feedback options)
+- [x] ADR-0002 Costanza seam: objective-worth read endpoint (pure, degrades to
+      `unavailable`) and reclaim-to-1080p executor (report-only default,
+      admin-confirm gated, write-ahead audited, exactly-once) —
+      `tests/test_downgrade.py`, `tests/test_api.py`
 
 ## Safety
 

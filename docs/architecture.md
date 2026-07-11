@@ -43,6 +43,7 @@ scheduled ─────┘        ▼
 | `judge/` | Provider abstraction (OpenAI-compatible / static), versioned prompt, strict `ModelVerdict` validation with one retry. |
 | `seerr/` | API client, canonical webhook template + normalizer, action planner. |
 | `sonarr/` | API client, post-hoc profile audit, fallback correction. |
+| `sonarr/downgrade.py` | ADR-0002 reclaim-to-1080p executor: report-only default, admin-confirm gated, write-ahead audited, exactly-once per Costanza decision. |
 | `store/db.py` | SQLite (WAL) decisions/feedback/audits/webhook events/executions + JSONL export. |
 | `executor.py` | The only write path; enforces the mode/write matrix. |
 | `api/app.py`, `cli.py` | Thin adapters over the same engine. |
@@ -78,6 +79,25 @@ prompt. The clamps above are what bound a prompt-injection attempt: the worst
 a malicious show description can achieve is flipping an ambiguous-band
 decision between two profiles you already trust, or forcing a manual-review
 hold — never a write the deterministic layer wouldn't allow.
+
+## The Costanza seam (ADR-0002)
+
+Two surfaces exist for the retention council, both off the request-time path:
+
+- **`GET /api/titles/{tvdb_id}/objective-worth`** — the objective lane only
+  (never household terms), computed on demand, records no decision, degrades
+  to `worth: unavailable` instead of erroring. tvdb→tmdb mapping is Seerr
+  search plus confirmation against `/tv/{tmdbId}` externalIds, so a wrong
+  search hit can never be scored.
+- **`POST /api/downgrades/plan` / `.../execute`** — the reclaim executor.
+  Plan is read-only and always available; execute requires the operator
+  token **and** `allow_writes` **and** `downgrade.admin_confirm_enabled`
+  (both ship off), and is exactly-once per Costanza decision id via a
+  write-ahead audit row that records each Sonarr step as it completes —
+  an interrupted attempt resumes its remaining idempotent steps on retry,
+  and `GET /api/downgrades/{id}` reconciles the actual outcome against
+  live Sonarr state. The reclaim itself is Sonarr's own import-then-delete
+  upgrade flow; resolute still deletes nothing.
 
 ## Write safety
 

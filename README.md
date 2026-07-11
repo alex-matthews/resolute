@@ -120,7 +120,11 @@ modes also refuse to start unless the webhook shared secret is configured
 4. **Guardrails** apply hard pins and caps, clamp the judge, and route
    uncertain cases to `hold_for_manual_review`.
 5. **Planner** emits a Seerr-first action plan; Sonarr mutation exists only as
-   an operator-approved fallback plus a read-only audit.
+   an operator-approved fallback plus a read-only audit. A separate,
+   independently-gated retention seam
+   ([docs/adr/0002](docs/adr/0002-downgrade-executor-and-worth-endpoint.md))
+   serves Costanza: an objective-worth read endpoint and a reclaim-to-1080p
+   executor that ships report-only.
 6. **Feedback** (`agree` / `prefer_1080p` / `prefer_2160p` / `manual_review` +
    reason tags) accumulates for the calibration loop
    ([docs/calibration.md](docs/calibration.md)).
