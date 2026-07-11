@@ -69,7 +69,7 @@ From the cleansheet design + handoff. Verification commands assume
       one engine
 - [x] No-network tests: fixtures, provider abstraction, guardrails, planner,
       audit, engine, store, CLI, API, webhook, wire-level Seerr client, golden
-      cases — `pytest` (113 tests)
+      cases — `pytest` (139 tests)
 - [x] Durable decision/feedback/audit history: SQLite on PVC + JSONL export
 - [x] Dockerfile, local run commands, config examples
       (`config/*.example.yaml`), home-ops manifests (`deploy/kubernetes/`)

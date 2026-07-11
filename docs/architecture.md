@@ -80,6 +80,15 @@ a malicious show description can achieve is flipping an ambiguous-band
 decision between two profiles you already trust, or forcing a manual-review
 hold — never a write the deterministic layer wouldn't allow.
 
+One indirect path deserves naming: **outside** the ambiguous band a
+disagreeing judge cannot flip the resolution, but it does lower confidence to
+medium, and a medium-confidence 2160p can then be flipped to 1080p by the
+episode-burden cap or the storage-pressure block. So a hostile overview can,
+at most, push a large or storage-pressured title down to 1080p — the
+conservative direction. It can never push anything *up* to 2160p, past a pin,
+or into a write. This is accepted by design: judge doubt making big
+commitments more conservative is the intended failure mode.
+
 ## The Costanza seam (ADR-0002)
 
 Two surfaces exist for the retention council, both off the request-time path:
