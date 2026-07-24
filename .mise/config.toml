@@ -6,7 +6,7 @@ kubeconform = "0.8.0"
 hadolint = "2.14.0"
 actionlint = "1.7.12"
 shellcheck = "0.11.0"
-zizmor = "1.26.1"
+zizmor = "1.28.0"
 yq = "4.53.3"
 
 [tasks.sync]
