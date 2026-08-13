@@ -39,7 +39,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
     RESOLUTE_DB_PATH=/data/resolute.db \
     RESOLUTE_POLICY_PATH=/config/policy.yaml
 
-USER nobody:nogroup
+# Numeric uid:gid (= nobody:nogroup) so hosts and Kubernetes runAsNonRoot
+# checks can resolve it without the image's /etc/passwd (DL3066).
+USER 65534:65534
 # 8080 main app, 8081 metrics (home-operations org port convention).
 EXPOSE 8080 8081
 
