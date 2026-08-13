@@ -125,10 +125,25 @@ def create_app(
                 return JSONResponse({"detail": "invalid api token"}, status_code=401)
             return await call_next(request)
 
+    def _record_model_metrics(involvement, fell_back: bool) -> None:
+        if not involvement.used:
+            return
+        metrics["model_calls_total"] += 1
+        if fell_back:
+            metrics["model_fallback_total"] += 1
+        if involvement.latency_ms:
+            metrics["model_latency_ms_sum"] += involvement.latency_ms
+            metrics["model_latency_ms_count"] += 1
+        if involvement.tokens_in:
+            metrics['model_tokens_total{direction="in"}'] += involvement.tokens_in
+        if involvement.tokens_out:
+            metrics['model_tokens_total{direction="out"}'] += involvement.tokens_out
+
     def _decide_and_store(request: DecisionRequest, mode: AutomationMode | None) -> Decision:
         decision = engine.decide(request, mode)
         store.save_decision(decision)
         metrics[f"decisions_total{{resolution=\"{decision.final_resolution}\"}}"] += 1
+        _record_model_metrics(decision.model_involvement, decision.verdict is None)
         return decision
 
     # -- health / observability -------------------------------------------
@@ -387,6 +402,7 @@ def create_app(
             }
 
         verdict, involvement = judge.judge_objective(facts)
+        _record_model_metrics(involvement, verdict is None)
         # Auditing is mandatory (ADR-0003): it compensates for lost
         # reproducibility. An audit row, never a decision.
         store.save_audit(

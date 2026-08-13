@@ -15,7 +15,14 @@ from .decision import (
     Recommendation,
     ScoreComponent,
 )
-from .evidence import DiskMount, EvidenceBundle, SeerrRequestState, ShowFacts, SonarrState
+from .evidence import (
+    DiskMount,
+    EvidenceBundle,
+    ObjectiveFacts,
+    SeerrRequestState,
+    ShowFacts,
+    SonarrState,
+)
 from .feedback import FeedbackIn, FeedbackRecord
 from .request import DecisionRequest
 from .verdict import (
@@ -43,6 +50,7 @@ __all__ = [
     "ModelAttempt",
     "ModelInvolvement",
     "ModelVerdict",
+    "ObjectiveFacts",
     "ObjectiveVerdict",
     "Recommendation",
     "Resolution",

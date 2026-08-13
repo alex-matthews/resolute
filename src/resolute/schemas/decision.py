@@ -50,6 +50,8 @@ class ModelAttempt(BaseModel):
     raw_output: str | None = None
     error: str | None = None
     latency_ms: int | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
 
 
 class ModelInvolvement(BaseModel):
@@ -67,6 +69,8 @@ class ModelInvolvement(BaseModel):
     raw_output: str | None = None
     error: str | None = None
     latency_ms: int | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
     attempts: list[ModelAttempt] = Field(default_factory=list)
 
 

@@ -448,6 +448,58 @@ def review_overrides(
         )
 
 
+@app.command("eval")
+def eval_models(
+    cases: str = typer.Option("fixtures/eval/cases.json", "--cases"),
+    repeat: int = typer.Option(3, help="Runs per case; stability is judged across them"),
+    config: str | None = _config_option,
+) -> None:
+    """Run the model-eval suite against the CONFIGURED LIVE model (spends money).
+
+    CI proves the safety plumbing with canned verdicts; this proves the thing
+    inside the rails. Scores acceptable-set membership, hold expectations, and
+    repeat stability — never exact prose. See docs/testing.md."""
+    from .evaluation import evaluate_cases
+    from .judge.judge import Judge
+    from .judge.provider import OpenAICompatProvider
+
+    settings = load_settings(config)
+    if not settings.judge.enabled or settings.judge.provider != "openai_compat":
+        typer.echo(
+            "eval needs the live model: set judge.enabled=true and provider"
+            " openai_compat (this command deliberately spends provider money)",
+            err=True,
+        )
+        raise typer.Exit(1)
+    household = load_household_policy(settings.household_policy_path)
+    judge = Judge(
+        OpenAICompatProvider(
+            base_url=settings.judge.base_url,
+            api_key=settings.judge.api_key,
+            model=settings.judge.model,
+            timeout_seconds=settings.judge.timeout_seconds,
+        )
+    )
+    case_list = json.loads(Path(cases).read_text())
+    results = evaluate_cases(case_list, judge, settings, household, repeat=repeat)
+    failures = 0
+    for r in results:
+        status = "PASS" if r.passed else "FAIL"
+        outcomes = ", ".join(f"{res}{'(held)' if held else ''}" for res, held in r.outcomes)
+        typer.echo(f"[{status}] {r.name}: {outcomes}")
+        for note in r.notes:
+            typer.echo(f"       note: {note}")
+        failures += 0 if r.passed else 1
+    total_tokens = sum(r.tokens_in + r.tokens_out for r in results)
+    total_ms = sum(r.latency_ms for r in results)
+    typer.echo(
+        f"{len(results) - failures}/{len(results)} cases passed"
+        f" | {settings.judge.model} | {total_ms} ms total | {total_tokens} tokens"
+    )
+    if failures:
+        raise typer.Exit(1)
+
+
 @app.command("fixtures-test")
 def fixtures_test(
     fixtures: str = typer.Option("fixtures/evidence", "--fixtures"),

@@ -60,9 +60,20 @@ class OpenAICompatProvider:
                 },
             )
             response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"]
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
         except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as exc:
+            self.last_usage = None
             raise ProviderError(f"model call failed: {exc}") from exc
+        usage = data.get("usage") or {}
+        self.last_usage = (
+            {
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
+            }
+            if usage
+            else None
+        )
         if not isinstance(content, str):
             raise ProviderError(
                 f"model returned non-string content ({type(content).__name__})"

@@ -648,3 +648,20 @@ def test_stored_v1_decision_round_trips(store):
     store.save_decision(decision)
     assert store.get_decision(decision.decision_id).score == 3.75
     assert store.list_decisions()[0].decision_id == decision.decision_id
+    # and through the HTTP surface, not just the store
+    from resolute.api.app import create_app
+    from resolute.config import HouseholdPolicy, Settings
+    from resolute.engine.engine import DecisionEngine
+    from resolute.metadata.source import FixtureEvidenceSource
+
+    settings = Settings(db_path=":memory:")
+    engine = DecisionEngine(
+        settings, HouseholdPolicy(), FixtureEvidenceSource("fixtures/evidence")
+    )
+    client = TestClient(create_app(settings, HouseholdPolicy(), engine, store, None))
+    got = client.get(f"/api/decisions/{decision.decision_id}")
+    assert got.status_code == 200
+    assert got.json()["score"] == 3.75
+    assert got.json()["model_involvement"]["prompt_version"] == "judge_v1"
+    listed = client.get("/api/decisions").json()
+    assert listed[0]["decision_id"] == decision.decision_id

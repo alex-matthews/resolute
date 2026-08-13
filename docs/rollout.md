@@ -31,8 +31,12 @@ weights to tune, only prose to edit.
   happened.
 - Record feedback: `resolute feedback last agree` / `prefer_1080p` after real
   approvals. Read the model's reasons when you disagree.
-- Watch `model_unavailable` in risk flags and worth/latency metrics: model
-  cost and latency are on the normal path now and must stay observable.
+- Watch `model_fallback_total`, `model_latency_ms_sum/count`, and
+  `model_tokens_total{direction}` on the metrics listener, plus
+  `model_unavailable` in risk flags: cost and degradation are on the normal
+  path now.
+- Before phase 1, run `mise run eval` against the configured model and
+  review the report (docs/testing.md layer 3).
 
 **Exit criterion:** `resolute calibrate` shows ≥ 80% agreement over at least
 15 decisions, and `review-overrides` shows no systematic cluster. When a

@@ -41,21 +41,30 @@ uv sync --locked
 # run the test suite
 .venv/bin/pytest
 
-# decide against bundled fixture evidence
+# decide against bundled fixture evidence — NOTE: with no model configured
+# this demonstrates the ADR-0003 degraded path (conservative 1080p + hold),
+# not a real decision; point judge.* at a live provider for those
 .venv/bin/resolute decide "Severance" --year 2022 --tmdb-id 95396 \
   --fixtures fixtures/evidence
 
-# run the golden decision suite
+# run the canned-verdict pipeline suite (rails/planner regressions)
 .venv/bin/resolute fixtures-test
+
+# model-quality evals run separately, against your live model (spends money):
+#   mise run eval        # see docs/testing.md
 ```
 
 ## Quick start (against your stack)
 
 ```bash
 cp config/config.example.yaml config/config.yaml   # edit URLs/profile names
+cp config/household.example.md config/household.md # write YOUR household prose
 export RESOLUTE_CONFIG_FILE=config/config.yaml
 export RESOLUTE_SEERR__API_KEY=...
 export RESOLUTE_SONARR__API_KEY=...   # optional: enables shadow deltas + audits
+export RESOLUTE_JUDGE__ENABLED=true RESOLUTE_JUDGE__API_KEY=...
+# without the judge config resolute runs degraded: every decision is the
+# conservative 1080p + hold fallback (ADR-0003)
 
 resolute serve                 # API on :8080
 resolute decide "Severance" --year 2022        # live metadata via Seerr
@@ -139,8 +148,8 @@ modes also refuse to start unless the webhook shared secret is configured
 
 ```text
 src/resolute/     engine, schemas, seerr/sonarr adapters, judge, store, api, cli
-tests/              137 no-network tests
-fixtures/           seerr/sonarr payloads, evidence bundles, golden expectations
+tests/              162 no-network tests (+ opt-in model evals: mise run eval)
+fixtures/           seerr/sonarr payloads, evidence bundles, pipeline + eval cases
 config/             config + household prose examples
 deploy/kubernetes/  Flux/app-template manifests (home-ops style)
 docs/               architecture, ADRs, rollout, deployment,
@@ -158,7 +167,8 @@ mise install          # toolchain: python 3.14, uv, helm, kubeconform, linters
 mise run sync         # uv sync --locked (incl. dev group)
 mise run test         # pytest
 mise run lint         # ruff
-mise run golden       # golden decision fixtures
+mise run golden       # canned-verdict pipeline fixtures
+mise run eval         # model-quality evals (LIVE model, spends money)
 mise run kubeconform  # render app-template + validate all manifests
 mise run build        # docker build (needs a Docker daemon)
 mise run ci           # core CI checks (everything except the container build)

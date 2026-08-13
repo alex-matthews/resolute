@@ -26,7 +26,7 @@ description = "Run ruff with --fix"
 run = "uv run ruff check --fix src tests"
 
 [tasks.golden]
-description = "Run the golden decision fixtures"
+description = "Run the canned-verdict pipeline fixtures (rails/planner regressions, not a taste oracle)"
 run = "RESOLUTE_DB_PATH=$(mktemp -d)/golden.db uv run resolute fixtures-test"
 
 [tasks.dockerfile-lint]
@@ -67,3 +67,7 @@ run = "docker build -t resolute:local ."
 [tasks.ci]
 description = "Core CI checks, locally (excludes the container build: run `mise run build` separately, it needs a Docker daemon)"
 depends = ["lint", "test", "golden", "dockerfile-lint", "shell-lint", "workflow-lint", "kubeconform"]
+
+[tasks.eval]
+description = "Model-eval suite against the CONFIGURED LIVE model (spends provider money; never part of ci). See docs/testing.md."
+run = "uv run resolute eval"

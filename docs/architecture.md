@@ -57,10 +57,11 @@ engine:
 1. **Closed choice set.** The `ModelVerdict` schema enums are the only
    resolutions and actions the model can express; a hallucinated profile or
    verb fails validation.
-2. **Strict validation, one retry.** An invalid response is retried once with
-   the validation error echoed back. A second invalid result, or an
-   unavailable provider, yields the conservative fallback: **recommend 1080p
-   and hold for review; no write**.
+2. **Strict validation, one retry.** An invalid response is retried once
+   with a sanitized error summary (field locations and error types — never
+   the offending values, which are untrusted model output). A second invalid
+   result, or an unavailable/malformed provider, yields the conservative
+   fallback: **recommend 1080p and hold for review; no write**.
 3. **Pending-state protection.** Seerr writes are planned only for pending
    requests, and pending state is re-read at execution time (ADR-0001).
 4. **Executor authority.** `allow_writes`, the mode matrix, approval gates,
@@ -91,7 +92,11 @@ but the guarantee lives in the rails, not the wording.
 
 Reproducibility is handled by audit, not determinism: every model-backed
 decision stores provider, model, prompt version, evidence hash, household
-prose hash, raw output, latency, and validation failures.
+prose hash, and per-attempt raw output, error, latency, and token counts.
+The metrics listener exposes `model_calls_total`, `model_fallback_total`,
+`model_latency_ms_sum/count`, and `model_tokens_total{direction}` so cost
+and degradation stay observable (see docs/testing.md for the validation
+layering).
 
 ## The Costanza seam (ADR-0002, amended by ADR-0003)
 

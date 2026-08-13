@@ -32,6 +32,36 @@ class ShowFacts(BaseModel):
     overview: str | None = None
 
 
+class ObjectiveFacts(BaseModel):
+    """Whitelisted projection of ShowFacts for the objective-worth invocation
+    (ADR-0003). Explicit allowlist, not a blacklist: a future cost-shaped
+    ShowFacts field is excluded here by default instead of silently entering
+    the objective prompt. Deliberately absent: number_of_seasons,
+    number_of_episodes, episode_run_time_minutes — episode-cost terms that
+    Costanza must not have double-counted (Costanza ADR-0011)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    canonical_title: str | None = None
+    year: int | None = None
+    tmdb_id: int | None = None
+    tvdb_id: int | None = None
+    imdb_id: str | None = None
+    genres: list[str] = Field(default_factory=list)
+    networks: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    status: str | None = None
+    vote_average: float | None = None
+    vote_count: int | None = None
+    popularity: float | None = None
+    original_language: str | None = None
+    overview: str | None = None
+
+    @classmethod
+    def from_show_facts(cls, facts: ShowFacts) -> ObjectiveFacts:
+        return cls(**{name: getattr(facts, name) for name in cls.model_fields})
+
+
 class SonarrState(BaseModel):
     """Current Sonarr view of the series, if it already exists downstream."""
 

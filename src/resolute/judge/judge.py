@@ -1,7 +1,7 @@
 """The primary decision model (ADR-0003): builds the prompt, calls the
-provider, and strictly validates the response. One retry with the validation
-error echoed back; a second invalid result or an unavailable provider returns
-None and the engine applies the conservative fallback (1080p + hold).
+provider, and strictly validates the response. One retry carrying a sanitized
+error summary; a second invalid result or an unavailable/malformed provider
+returns None and the engine applies the conservative fallback (1080p + hold).
 
 Two entry points, two invocation contracts:
 
@@ -26,6 +26,7 @@ from ..schemas import (
     ModelAttempt,
     ModelInvolvement,
     ModelVerdict,
+    ObjectiveFacts,
     ObjectiveVerdict,
     ShowFacts,
 )
@@ -85,24 +86,14 @@ def build_request_prompt(
     )
 
 
-# Excluded from the objective invocation: episode/season counts and runtime
-# are cost terms (ADR-0003: "no episode-cost terms"), not title merit —
-# Costanza holds true size-on-disk and must not have cost double-counted
-# (Costanza ADR-0011). Exclusion at the input, not by instruction.
-_OBJECTIVE_EXCLUDED_FACTS = frozenset(
-    {"number_of_seasons", "number_of_episodes", "episode_run_time_minutes"}
-)
-
-
 def build_objective_prompt(facts: ShowFacts) -> str:
-    """Objective-only invocation: takes ShowFacts and nothing else, and strips
-    the cost-shaped fields, so the isolation contract is structural rather
-    than a convention."""
+    """Objective-only invocation: ObjectiveFacts is an explicit whitelist
+    projection, so cost-shaped fields (episode/season counts, runtime — the
+    'episode-cost terms' ADR-0003 prohibits) are excluded at the input, and a
+    future ShowFacts field stays out until deliberately allowlisted."""
+    projection = ObjectiveFacts.from_show_facts(facts)
     return OBJECTIVE_USER_TEMPLATE.format(
-        facts_json=json.dumps(
-            facts.model_dump(mode="json", exclude=set(_OBJECTIVE_EXCLUDED_FACTS)),
-            indent=2,
-        )
+        facts_json=json.dumps(projection.model_dump(mode="json"), indent=2)
     )
 
 
@@ -156,6 +147,13 @@ class Judge:
                 break
             attempt.raw_output = involvement.raw_output = raw
             attempt.latency_ms = int((time.monotonic() - attempt_started) * 1000)
+            usage = getattr(self.provider, "last_usage", None) or {}
+            attempt.tokens_in = usage.get("prompt_tokens")
+            attempt.tokens_out = usage.get("completion_tokens")
+            if attempt.tokens_in:
+                involvement.tokens_in = (involvement.tokens_in or 0) + attempt.tokens_in
+            if attempt.tokens_out:
+                involvement.tokens_out = (involvement.tokens_out or 0) + attempt.tokens_out
             try:
                 verdict = schema.model_validate_json(_extract_json(raw))
                 involvement.latency_ms = int((time.monotonic() - started) * 1000)

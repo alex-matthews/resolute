@@ -1,0 +1,100 @@
+"""Wire-level tests for the shipped OpenAI-compatible provider via
+httpx.MockTransport: exact outgoing payload and the malformed-response matrix
+(adversarial review round 3)."""
+
+import json
+
+import httpx
+import pytest
+
+from resolute.judge.provider import OpenAICompatProvider, ProviderError
+
+
+def _provider(handler) -> OpenAICompatProvider:
+    client = httpx.Client(
+        base_url="http://litellm.test/v1", transport=httpx.MockTransport(handler)
+    )
+    return OpenAICompatProvider(
+        base_url="http://litellm.test/v1", api_key="k", model="test-model", client=client
+    )
+
+
+def _ok(content, usage=None):
+    body = {"choices": [{"message": {"content": content}}]}
+    if usage is not None:
+        body["usage"] = usage
+    return httpx.Response(200, json=body)
+
+
+def test_outgoing_payload_shape():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return _ok('{"x": 1}')
+
+    provider = _provider(handler)
+    out = provider.complete_json("SYS", "USER")
+    assert out == '{"x": 1}'
+    assert seen["path"] == "/v1/chat/completions"
+    body = seen["body"]
+    assert body["model"] == "test-model"
+    assert body["messages"] == [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": "USER"},
+    ]
+    assert body["response_format"] == {"type": "json_object"}
+
+
+def test_null_content_is_provider_error():
+    provider = _provider(lambda req: _ok(None))
+    with pytest.raises(ProviderError, match="non-string content"):
+        provider.complete_json("s", "u")
+
+
+def test_missing_choices_is_provider_error():
+    provider = _provider(lambda req: httpx.Response(200, json={"object": "error"}))
+    with pytest.raises(ProviderError, match="model call failed"):
+        provider.complete_json("s", "u")
+
+
+def test_http_error_is_provider_error():
+    provider = _provider(lambda req: httpx.Response(503, text="down"))
+    with pytest.raises(ProviderError):
+        provider.complete_json("s", "u")
+
+
+def test_oversized_content_is_truncated():
+    provider = _provider(lambda req: _ok("x" * 200_000))
+    assert len(provider.complete_json("s", "u")) == OpenAICompatProvider._MAX_RESPONSE_CHARS
+
+
+def test_usage_is_captured_and_cleared():
+    provider = _provider(
+        lambda req: _ok('{"x": 1}', usage={"prompt_tokens": 321, "completion_tokens": 45})
+    )
+    provider.complete_json("s", "u")
+    assert provider.last_usage == {"prompt_tokens": 321, "completion_tokens": 45}
+
+
+def test_litellm_extra_fields_tolerated():
+    def handler(req):
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-1",
+                "object": "chat.completion",
+                "model": "claude-haiku-4-5",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {"role": "assistant", "content": '{"ok": true}'},
+                    }
+                ],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            },
+        )
+
+    assert _provider(handler).complete_json("s", "u") == '{"ok": true}'
