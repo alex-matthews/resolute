@@ -9,6 +9,11 @@ baseline) rather than a blocking grab→import monitor, and exactly-once
 means one *successful* execution — an interrupted attempt leaves a
 truthful step-state audit row and a retry **resumes** the remaining
 idempotent steps instead of being refused.
+Amended by [ADR-0003](0003-llm-primary-decision-engine.md) (2026-08-13):
+the worth endpoint's deterministic-scoring premise is superseded — the
+objective read becomes model-derived and the numeric `objective_score` is
+removed at the v2 cutover; the executor, its gates, and the TV-only scope
+fence are untouched.
 Date: 2026-07-07
 
 Companion to Costanza **ADR-0011** (the cross-system authority: the council

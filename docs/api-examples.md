@@ -168,6 +168,14 @@ curl -s localhost:8080/api/titles/371980/objective-worth
 #     "metadata_gaps": []}
 # unresolvable ids degrade instead of erroring:
 # -> {"tvdb_id": 999, "worth": "unavailable", "reason": "..."}
+#
+# DEPRECATED at the v2 cutover (ADR-0003): `objective_score` is a v1 weighted
+# sum whose semantics do not survive the LLM-primary pivot; it is REMOVED, not
+# re-derived, when v2 lands. Consumers must use the categorical fields —
+# `worth`, `confidence`, `reasons` — which are retained unchanged, as is the
+# `worth: unavailable` degradation (which will then also cover model
+# unavailability). See docs/adr/0003-llm-primary-decision-engine.md and the
+# amendment to Costanza ADR-0011.
 ```
 
 ## Downgrade (ADR-0002, report-only by default)
