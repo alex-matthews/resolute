@@ -21,6 +21,10 @@ LABEL org.opencontainers.image.source="https://github.com/alex-matthews/resolute
 
 COPY --from=build /app/.venv /app/.venv
 
+# The runtime installs nothing: pip/setuptools/wheel (and pip's vendored
+# libraries) are the image's main CVE surface and serve no purpose here —
+# uv built the venv at build time. ensurepip goes too so nothing can
+# resurrect pip in a running container.
 # Identity-agnostic image (home-operations/containers precedent, e.g.
 # apps/tautulli): no user is created, nothing is chown'd, and no household
 # file is baked in. Kubernetes owns storage identity (runAsUser/runAsGroup/
@@ -32,7 +36,12 @@ COPY --from=build /app/.venv /app/.venv
 # /config and /data exist empty (no chown) so ConfigMap subPath/file
 # mounts and PVC mount points have stable targets under kubelet with a
 # read-only rootfs, not just under Docker bind mounts.
-RUN mkdir -p /config /data
+RUN rm -rf /usr/local/lib/python3.14/site-packages/pip* \
+           /usr/local/lib/python3.14/site-packages/setuptools* \
+           /usr/local/lib/python3.14/site-packages/wheel* \
+           /usr/local/lib/python3.14/ensurepip \
+           /usr/local/bin/pip* \
+    && mkdir -p /config /data
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \

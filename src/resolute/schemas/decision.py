@@ -52,6 +52,8 @@ class ModelAttempt(BaseModel):
     latency_ms: int | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
+    # What the provider said it ran (may differ from the configured name).
+    reported_model: str | None = None
 
 
 class ModelInvolvement(BaseModel):

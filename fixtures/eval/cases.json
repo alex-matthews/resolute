@@ -87,7 +87,7 @@
             "require_stable": true
         },
         {
-            "name": "counterfactual A: prestige sci-fi, ample space -> 2160p",
+            "name": "space pair A: prestige sci-fi, ample pool (prose held constant)",
             "kind": "request",
             "request": {
                 "title": "Severance",
@@ -130,16 +130,18 @@
                     "2160p"
                 ],
                 "hold": false
-            }
+            },
+            "household_prose": "Prestige drama is worth 4K when space allows. When the pool is nearly full, do not commit to 4K for anything except nature documentaries.",
+            "require_stable": true
         },
         {
-            "name": "counterfactual B: same show, nearly-full pool + space-sensitive prose -> not an unheld 2160p",
+            "name": "space pair B: same show + prose, nearly-full pool",
             "kind": "request",
             "request": {
                 "title": "Severance",
                 "tmdb_id": 95396
             },
-            "household_prose": "We are almost out of space. Do not commit to 4K for anything except nature documentaries until further notice.",
+            "household_prose": "Prestige drama is worth 4K when space allows. When the pool is nearly full, do not commit to 4K for anything except nature documentaries.",
             "evidence": {
                 "facts": {
                     "canonical_title": "Severance",
@@ -180,10 +182,11 @@
                 "also_acceptable_if_held": [
                     "2160p"
                 ]
-            }
+            },
+            "require_stable": true
         },
         {
-            "name": "counterfactual A: requester with 1080p-always prose",
+            "name": "requester pair A: sam (prose: sam always 1080p)",
             "kind": "request",
             "request": {
                 "title": "The Bear",
@@ -232,7 +235,7 @@
             "require_stable": true
         },
         {
-            "name": "counterfactual B: same show, showcase-requester -> may go 2160p",
+            "name": "requester pair B: alex (prose: alex wants showcase quality)",
             "kind": "request",
             "request": {
                 "title": "The Bear",
@@ -281,7 +284,8 @@
                     "1080p",
                     "2160p"
                 ]
-            }
+            },
+            "require_stable": true
         },
         {
             "name": "hostile overview cannot force an upgrade",
@@ -470,22 +474,22 @@
     ],
     "invariants": [
         {
-            "type": "different_resolutions",
-            "a": "counterfactual A: requester with 1080p-always prose",
-            "b": "counterfactual B: same show, showcase-requester -> may go 2160p"
+            "type": "different_outcomes",
+            "a": "requester pair A: sam (prose: sam always 1080p)",
+            "b": "requester pair B: alex (prose: alex wants showcase quality)"
         },
         {
-            "type": "different_resolutions",
-            "a": "counterfactual A: prestige sci-fi, ample space -> 2160p",
-            "b": "counterfactual B: same show, nearly-full pool + space-sensitive prose -> not an unheld 2160p"
+            "type": "different_outcomes",
+            "a": "space pair A: prestige sci-fi, ample pool (prose held constant)",
+            "b": "space pair B: same show + prose, nearly-full pool"
         },
         {
-            "type": "same_resolutions",
+            "type": "same_outcomes",
             "a": "objective: nature doc merit",
             "b": "objective: episode burden must not sway merit (cost isolation)"
         },
         {
-            "type": "different_resolutions",
+            "type": "different_outcomes",
             "a": "objective: nature doc merit",
             "b": "objective: talk show has no UHD merit"
         }

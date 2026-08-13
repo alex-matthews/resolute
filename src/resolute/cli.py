@@ -517,9 +517,12 @@ def eval_models(
         results=results,
         invariant_results=invariant_results,
     )
+    # Default under the writable data volume (db_path's directory): in-cluster
+    # the rootfs is read-only and only /data and /tmp are writable, so a
+    # CWD-relative default would spend the model budget and then fail to save.
+    stamp = doc["generated_at"].replace(":", "").replace("+0000", "Z")
     out_path = Path(
-        report
-        or f"data/eval-reports/eval-{doc['generated_at'].replace(':', '').replace('+0000', 'Z')}.json"
+        report or Path(settings.db_path).parent / "eval-reports" / f"eval-{stamp}.json"
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(doc, indent=2) + "\n")
@@ -567,13 +570,27 @@ def fixtures_test(
         decision = engine.decide(request, AutomationMode.SHADOW)
         expected = Resolution(case["expected_resolution"])
         expect_hold = bool(case.get("expect_hold", False))
-        held = any("hold" in a.type or a.type == "insufficient_metadata" for a in decision.action_plan)
+        held = any(
+            "hold" in a.type or a.type == "insufficient_metadata"
+            for a in decision.action_plan
+        )
         ok = decision.final_resolution is expected and held == expect_hold
+        detail = ""
+        if "expect_actions" in case:
+            got_actions = [a.type.value for a in decision.action_plan]
+            if got_actions != case["expect_actions"]:
+                ok = False
+                detail = f" plan={got_actions} want={case['expect_actions']}"
+        if "expect_approval_flags" in case:
+            got_flags = [a.requires_approval for a in decision.action_plan]
+            if got_flags != case["expect_approval_flags"]:
+                ok = False
+                detail += f" approvals={got_flags} want={case['expect_approval_flags']}"
         status = "PASS" if ok else "FAIL"
         typer.echo(
             f"[{status}] {case.get('name', request.identity_hint())}: "
             f"got {decision.final_resolution} hold={held}, "
-            f"want {expected} hold={expect_hold}"
+            f"want {expected} hold={expect_hold}{detail}"
         )
         failures += 0 if ok else 1
     typer.echo(f"{len(cases) - failures}/{len(cases)} pipeline cases passed")

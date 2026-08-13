@@ -48,6 +48,8 @@ class OpenAICompatProvider:
     _MAX_RESPONSE_CHARS = 50_000
 
     def complete_json(self, system: str, user: str) -> str:
+        self.last_usage = None
+        self.last_reported_model = None
         try:
             response = self._client.post(
                 "/chat/completions",
@@ -65,8 +67,8 @@ class OpenAICompatProvider:
             data = response.json()
             content = data["choices"][0]["message"]["content"]
         except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as exc:
-            self.last_usage = None
             raise ProviderError(f"model call failed: {exc}") from exc
+        self.last_reported_model = data.get("model")
         usage = data.get("usage") or {}
         self.last_usage = (
             {

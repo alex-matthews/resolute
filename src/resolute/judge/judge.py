@@ -110,6 +110,19 @@ class Judge:
     ) -> V | None:
         started = time.monotonic()
         last_error = ""
+
+        def capture_usage(attempt: ModelAttempt) -> None:
+            # A rejected response (null/oversized content) is still a PAID
+            # call: the provider preserves its usage, and the audit must too.
+            usage = getattr(self.provider, "last_usage", None) or {}
+            attempt.tokens_in = usage.get("prompt_tokens")
+            attempt.tokens_out = usage.get("completion_tokens")
+            attempt.reported_model = getattr(self.provider, "last_reported_model", None)
+            if attempt.tokens_in:
+                involvement.tokens_in = (involvement.tokens_in or 0) + attempt.tokens_in
+            if attempt.tokens_out:
+                involvement.tokens_out = (involvement.tokens_out or 0) + attempt.tokens_out
+
         for attempt_no in range(2):
             attempt = ModelAttempt()
             involvement.attempts.append(attempt)
@@ -130,6 +143,7 @@ class Judge:
             except ProviderError as exc:
                 attempt.error = involvement.error = str(exc)
                 attempt.latency_ms = int((time.monotonic() - attempt_started) * 1000)
+                capture_usage(attempt)
                 break
             except Exception as exc:
                 # become the fallback, never a 500 (adversarial review #3)
@@ -147,13 +161,7 @@ class Judge:
                 break
             attempt.raw_output = involvement.raw_output = raw
             attempt.latency_ms = int((time.monotonic() - attempt_started) * 1000)
-            usage = getattr(self.provider, "last_usage", None) or {}
-            attempt.tokens_in = usage.get("prompt_tokens")
-            attempt.tokens_out = usage.get("completion_tokens")
-            if attempt.tokens_in:
-                involvement.tokens_in = (involvement.tokens_in or 0) + attempt.tokens_in
-            if attempt.tokens_out:
-                involvement.tokens_out = (involvement.tokens_out or 0) + attempt.tokens_out
+            capture_usage(attempt)
             try:
                 verdict = schema.model_validate_json(_extract_json(raw))
                 involvement.latency_ms = int((time.monotonic() - started) * 1000)

@@ -82,7 +82,7 @@ From the cleansheet design + handoff. Verification commands assume
 - [x] No-network tests: fixtures, provider wire (MockTransport), rails,
       planner, audit, engine, store, CLI, API, webhook, wire-level Seerr
       client, eval-harness mechanics, canned-verdict pipeline cases —
-      `pytest` (162 tests)
+      `pytest` (run it for the current count; numbers in docs rot)
 - [x] Validation layering is explicit (docs/testing.md): CI proves safety and
       integration; model quality is gated by `resolute eval` (live model,
       opt-in) and shadow evidence — never by green unit tests

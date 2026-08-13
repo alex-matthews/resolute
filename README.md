@@ -148,7 +148,7 @@ modes also refuse to start unless the webhook shared secret is configured
 
 ```text
 src/resolute/     engine, schemas, seerr/sonarr adapters, judge, store, api, cli
-tests/              162 no-network tests (+ opt-in model evals: mise run eval)
+tests/              no-network suite (pytest; + opt-in model evals: mise run eval)
 fixtures/           seerr/sonarr payloads, evidence bundles, pipeline + eval cases
 config/             config + household prose examples
 deploy/kubernetes/  Flux/app-template manifests (home-ops style)

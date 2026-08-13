@@ -6,7 +6,7 @@
 #   - read-only root filesystem, all capabilities dropped
 #   - no usable HOME
 #   - only the mounted /data writable
-#   - policy mounted read-only (the image ships none)
+#   - household prose mounted read-only (the image ships none)
 # Asserts /healthz and /readyz answer 200, the DB lands in /data, and the
 # logs are free of errors.
 set -euo pipefail

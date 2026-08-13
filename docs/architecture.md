@@ -149,8 +149,9 @@ a fixture farm), `executions` (including partial executions recorded before a
 mid-plan failure surfaces). `export-jsonl` provides append-only export.
 
 Stored v1 decisions remain readable: the v1 scoring fields (`score`,
-`score_components`) are retained in the schema as optional relics that new
-decisions simply leave empty.
+`score_components`) are retained as compatibility relics — new decisions
+write a synthetic `score` of `0.0` (the column is NOT NULL) and an empty
+component list; the CLI only displays a score when it is a real v1 record.
 
 Access is serialized with an in-process lock, which makes the service a
 **strict single-writer**: one replica, one uvicorn worker, no concurrent CLI

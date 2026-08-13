@@ -15,15 +15,33 @@ Writes are earned, not assumed. Each phase has an explicit exit criterion.
   profile names to IDs, confirms pending TV requests are visible, and lists
   Sonarr profiles. All checks must pass before moving on.
 
+## Phase 0.5 — the eval gate (model still OFF)
+
+The manifests deliberately ship `RESOLUTE_JUDGE__ENABLED: "false"`: deployed
+resolute runs degraded (every decision a conservative 1080p hold) and spends
+nothing — including the nightly review CronJob. Before enabling the model
+anywhere:
+
+- Review and expand `fixtures/eval/cases.json` (it was authored by the
+  implementing model; its acceptable-sets encode taste assumptions).
+- Run the eval in-cluster with a per-invocation override — the deployment
+  itself stays model-off:
+  `kubectl exec deploy/resolute -- env RESOLUTE_JUDGE__ENABLED=true resolute eval`
+  The report lands under `/data/eval-reports/` (the writable volume).
+- Review the report: case passes, invariant passes, schema-failure rate,
+  latency and token cost. Re-run after model, prompt-version, or prose
+  changes.
+
+**Exit criterion:** a reviewed, passing eval report for the exact model and
+prompt version you are about to enable.
+
 ## Phase 1 — shadow (no writes, weeks 1–2)
 
 Shadow mode **is** the calibration method in v2 (ADR-0003): there are no
 weights to tune, only prose to edit.
 
-- Deploy with `mode: shadow`, `allow_writes: false`, and the model
-  **enabled** (`judge.enabled: true` pointing at LiteLLM) — with the model
-  off, every decision is just the conservative 1080p hold and shadow data is
-  meaningless. Mount the household prose (see `config/household.example.md`).
+- Flip `RESOLUTE_JUDGE__ENABLED: "true"` (with the phase 0.5 report in hand).
+  Mount the household prose (see `config/household.example.md`).
 - Configure the Seerr webhook (see README) for "Request Pending Approval".
 - Humans keep approving requests in Seerr exactly as before.
 - resolute records a decision per request — with the model's stated reasons —
@@ -36,8 +54,6 @@ weights to tune, only prose to edit.
   on the metrics listener, plus
   `model_unavailable` in risk flags: cost and degradation are on the normal
   path now.
-- Before phase 1, run `mise run eval` against the configured model and
-  review the report (docs/testing.md layer 3).
 
 **Exit criterion:** `resolute calibrate` shows ≥ 80% agreement over at least
 15 decisions, and `review-overrides` shows no systematic cluster. When a

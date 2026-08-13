@@ -46,10 +46,14 @@ the **configured production model**, spending real money, scored against
 Household prose loading is **required** (same as production serve): an eval
 against accidentally-empty prose would validate the wrong policy.
 
-Every run writes a durable JSON report (`data/eval-reports/`, or `--report`)
-identifying the commit, corpus hash, model/provider/prompt version, household
-hash, and per-run resolutions, holds, confidences, reasons, latency, and
-tokens. "Reviewing the Layer 3 report" means this artifact, not scrollback.
+Every run writes a durable JSON report — default under the writable data
+volume (`<db_path dir>/eval-reports/`; in-cluster that is `/data`, since the
+rootfs is read-only), or `--report` — identifying the commit and worktree
+dirtiness, corpus hash, configured and provider-reported model, prompt
+version, per-case household hash, and per-run resolutions, holds,
+confidences, reasons, latency, tokens, and the full per-attempt audit
+(including rejected paid calls and their usage). "Reviewing the Layer 3
+report" means this artifact, not scrollback.
 
 Run it before leaving shadow mode, after changing the model or prompt version,
 and when editing household prose changes expected outcomes. The harness's own
@@ -77,7 +81,7 @@ and `model_tokens_total{direction}`.
 
 | Gate | Evidence required |
 | --- | --- |
-| Merging code | Layers 1–2 green in CI |
-| Enabling shadow with the model | Layer 3 report reviewed |
+| Merging code | Layers 1–2 green in CI (the deploy template ships the model OFF) |
+| Enabling the model in shadow | Layer 3 report reviewed — rollout.md phase 0.5; the manifest flip is the gate |
 | Leaving shadow (approve mode) | Layer 4: rollout.md phase-1 exit criteria |
 | Auto modes | Layer 4 sustained (rollout.md phases 3–4) |

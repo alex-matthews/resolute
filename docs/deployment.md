@@ -5,8 +5,19 @@
 `deploy/kubernetes/` follows the Flux + bjw-s app-template conventions used in
 home-ops: copy the directory to `kubernetes/apps/default/resolute/` (with
 `ks.yaml` one level above `app/`), adjust the image repository to wherever the
-Docker image is published, and create a `resolute` item in 1Password with
-`RESOLUTE_MODEL_API_KEY` and `RESOLUTE_WEBHOOK_SECRET`.
+Docker image is published, and create a `resolute` item in 1Password carrying
+**every** field the ExternalSecrets template references — ESO v2 templating
+fails reconciliation on a missing key rather than substituting an empty
+string, so a partial item means no Secret and a pod stuck at startup:
+
+- `RESOLUTE_MODEL_API_KEY`
+- `RESOLUTE_WEBHOOK_SECRET`
+- `RESOLUTE_EXECUTE_TOKEN`
+- `RESOLUTE_API_TOKEN`
+- `RESOLUTE_HOUSEHOLD_PROSE` (the household preference prose itself)
+
+(`SEERR_API_KEY` and `SONARR_API_KEY` come from the existing `seerr` and
+`sonarr` items.)
 
 Components:
 

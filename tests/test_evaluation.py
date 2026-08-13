@@ -102,7 +102,7 @@ def test_household_prose_override_reaches_prompt(settings):
 
 def test_invariant_catches_ineffective_requester_context(settings):
     """Round-4 review: two independently-passing cases prove nothing. A judge
-    answering 1080p to everything must FAIL the pair invariant."""
+    answering an unheld 1080p to everything must FAIL the pair invariant."""
     from resolute.evaluation import check_invariants
 
     judge = Judge(CannedProvider(make_verdict("1080p", "high")))
@@ -113,10 +113,66 @@ def test_invariant_catches_ineffective_requester_context(settings):
     results = evaluate_cases(cases, judge, settings, HouseholdPolicy(), repeat=2)
     assert all(r.passed for r in results)  # individually fine...
     invs = check_invariants(
-        results, [{"type": "different_resolutions", "a": "A", "b": "B"}]
+        results, [{"type": "different_outcomes", "a": "A", "b": "B"}]
     )
     assert not invs[0].passed  # ...but the pair proves no influence
     assert "no observable effect" in invs[0].detail
+
+
+def test_invariant_hold_state_is_a_distinct_outcome(settings):
+    """Round-5 review: an unheld 2160p vs a HELD 2160p is a real difference —
+    resolution-set comparison wrongly failed this pair."""
+    from resolute.evaluation import check_invariants
+
+    judge_a = Judge(CannedProvider(make_verdict("2160p", "high")))
+    judge_b = Judge(
+        CannedProvider(make_verdict("2160p", "medium", action="hold_for_manual_review"))
+    )
+    ra = evaluate_cases(
+        [_case(name="A", accept={"resolutions": ["2160p"], "hold": False})],
+        judge_a, settings, HouseholdPolicy(), repeat=2,
+    )
+    rb = evaluate_cases(
+        [_case(name="B", accept={"resolutions": [], "hold": None,
+                                 "also_acceptable_if_held": ["2160p"]})],
+        judge_b, settings, HouseholdPolicy(), repeat=2,
+    )
+    invs = check_invariants(
+        ra + rb, [{"type": "different_outcomes", "a": "A", "b": "B"}]
+    )
+    assert invs[0].passed
+
+
+def test_invariant_rejects_unstable_operands(settings):
+    """Round-5 review: an alternating operand must fail the invariant — a
+    wandering baseline cannot attribute effects to the varied input."""
+    from resolute.evaluation import check_invariants
+
+    class Alternating:
+        name = "alt"
+        model = "alt"
+
+        def __init__(self):
+            self.n = 0
+
+        def complete_json(self, s, u):
+            self.n += 1
+            return make_verdict("2160p" if self.n % 2 else "1080p", "high")
+
+    ra = evaluate_cases(
+        [_case(name="A", accept={"resolutions": ["1080p", "2160p"], "hold": False})],
+        Judge(Alternating()), settings, HouseholdPolicy(), repeat=2,
+    )
+    rb = evaluate_cases(
+        [_case(name="B", accept={"resolutions": ["1080p"], "hold": False})],
+        Judge(CannedProvider(make_verdict("1080p", "high"))), settings,
+        HouseholdPolicy(), repeat=2,
+    )
+    invs = check_invariants(
+        ra + rb, [{"type": "different_outcomes", "a": "A", "b": "B"}]
+    )
+    assert not invs[0].passed
+    assert "unstable operand" in invs[0].detail
 
 
 def test_invariant_same_resolutions_detects_leak(settings):
@@ -152,7 +208,7 @@ def test_invariant_same_resolutions_detects_leak(settings):
 
     results = evaluate_cases(cases, Judge(ByTitleObjective()), settings, HouseholdPolicy(), repeat=1)
     invs = check_invariants(
-        results, [{"type": "same_resolutions", "a": "base", "b": "burdened"}]
+        results, [{"type": "same_outcomes", "a": "base", "b": "burdened"}]
     )
     assert not invs[0].passed
     assert "leaked" in invs[0].detail

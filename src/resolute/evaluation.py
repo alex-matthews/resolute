@@ -21,12 +21,16 @@ Case:
 
 Invariant (the piece that makes counterfactual PAIRS mean something — two
 independently-passing cases prove nothing about influence):
-  {"type": "different_resolutions" | "same_resolutions",
+  {"type": "different_outcomes" | "same_outcomes",
    "a": "<case name>", "b": "<case name>"}
-`different_resolutions` fails when both cases produce identical resolution
-sets across repeats (e.g. a judge that answers 1080p to everything);
-`same_resolutions` fails when they diverge (e.g. episode burden leaking into
-the objective judgment).
+Invariants compare complete (resolution, held) outcome sets — a hold is a
+different outcome from an unheld decision. Both operand cases must be stable
+across repeats (an unstable operand fails the invariant: effects cannot be
+attributed to the varied input if the baseline itself wanders), and corpus
+pairs must vary exactly one input. `different_outcomes` fails when the varied
+input had no observable effect (e.g. a judge answering an unheld 1080p to
+everything); `same_outcomes` fails when an isolated input leaked in (e.g.
+episode burden shifting the objective judgment).
 """
 
 from __future__ import annotations
@@ -53,6 +57,9 @@ class Run:
     latency_ms: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
+    # Per-attempt audit (error, raw output, tokens, provider-reported model):
+    # the report is the durable record of what each paid call actually did.
+    attempts: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -62,10 +69,15 @@ class CaseResult:
     schema_failures: int = 0
     passed: bool = False
     notes: list[str] = field(default_factory=list)
+    household_hash: str | None = None
 
     @property
     def resolution_set(self) -> frozenset[str]:
         return frozenset(r.resolution for r in self.runs)
+
+    @property
+    def outcome_set(self) -> frozenset[tuple[str, bool]]:
+        return frozenset((r.resolution, r.held) for r in self.runs)
 
     @property
     def outcomes(self) -> list[tuple[str, bool]]:
@@ -87,6 +99,10 @@ class _OneShotEvidence:
         return self._bundle.model_copy(deep=True)
 
 
+def _attempts_dump(involvement) -> list[dict]:
+    return [a.model_dump(mode="json") for a in involvement.attempts]
+
+
 def _run_once(
     case: dict, judge: Judge, settings: Settings, household: HouseholdPolicy
 ) -> Run:
@@ -94,7 +110,14 @@ def _run_once(
         facts = ShowFacts(**case["facts"])
         verdict, involvement = judge.judge_objective(facts)
         if verdict is None:
-            return Run("schema_failure", False, latency_ms=involvement.latency_ms or 0)
+            return Run(
+                "schema_failure",
+                False,
+                latency_ms=involvement.latency_ms or 0,
+                tokens_in=involvement.tokens_in or 0,
+                tokens_out=involvement.tokens_out or 0,
+                attempts=_attempts_dump(involvement),
+            )
         return Run(
             verdict.objective.resolution.value,
             False,
@@ -103,6 +126,7 @@ def _run_once(
             latency_ms=involvement.latency_ms or 0,
             tokens_in=involvement.tokens_in or 0,
             tokens_out=involvement.tokens_out or 0,
+            attempts=_attempts_dump(involvement),
         )
 
     evidence = EvidenceBundle.model_validate(case["evidence"])
@@ -110,7 +134,14 @@ def _run_once(
     decision = engine.decide(DecisionRequest(**case["request"]), AutomationMode.SHADOW)
     involvement = decision.model_involvement
     if decision.verdict is None:
-        return Run("schema_failure", True, latency_ms=involvement.latency_ms or 0)
+        return Run(
+            "schema_failure",
+            True,
+            latency_ms=involvement.latency_ms or 0,
+            tokens_in=involvement.tokens_in or 0,
+            tokens_out=involvement.tokens_out or 0,
+            attempts=_attempts_dump(involvement),
+        )
     return Run(
         decision.final_resolution.value,
         any("hold" in a.type for a in decision.action_plan),
@@ -119,6 +150,7 @@ def _run_once(
         latency_ms=involvement.latency_ms or 0,
         tokens_in=involvement.tokens_in or 0,
         tokens_out=involvement.tokens_out or 0,
+        attempts=_attempts_dump(involvement),
     )
 
 
@@ -145,6 +177,7 @@ def evaluate_cases(
             if case.get("household_prose")
             else default_household
         )
+        result.household_hash = household.content_hash
         for _ in range(max(1, repeat)):
             run = _run_once(case, judge, settings, household)
             if run.resolution == "schema_failure":
@@ -176,13 +209,23 @@ def check_invariants(
         if a is None or b is None:
             out.append(InvariantResult(description, False, "referenced case not found"))
             continue
-        detail = f"{sorted(a.resolution_set)} vs {sorted(b.resolution_set)}"
-        if kind == "different_resolutions":
-            passed = a.resolution_set != b.resolution_set
+        detail = f"{sorted(a.outcome_set)} vs {sorted(b.outcome_set)}"
+        unstable = [r.name for r in (a, b) if len(r.outcome_set) > 1]
+        if unstable:
+            # Effects cannot be attributed to the varied input when an
+            # operand's own outcome wanders across repeats.
+            out.append(
+                InvariantResult(
+                    description, False, f"unstable operand(s) {unstable}: {detail}"
+                )
+            )
+            continue
+        if kind == "different_outcomes":
+            passed = a.outcome_set != b.outcome_set
             if not passed:
                 detail += " — identical: the varied input had no observable effect"
-        elif kind == "same_resolutions":
-            passed = a.resolution_set == b.resolution_set
+        elif kind == "same_outcomes":
+            passed = a.outcome_set == b.outcome_set
             if not passed:
                 detail += " — diverged: the isolated input leaked into the judgment"
         else:
@@ -191,9 +234,9 @@ def check_invariants(
     return out
 
 
-def _git_commit() -> str | None:
+def _git_state() -> tuple[str | None, bool | None]:
     try:
-        return (
+        commit = (
             subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 capture_output=True,
@@ -203,8 +246,18 @@ def _git_commit() -> str | None:
             ).stdout.strip()
             or None
         )
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            ).stdout.strip()
+        )
     except OSError:
-        return None
+        return None, None
+    return commit, dirty
 
 
 def build_report(
@@ -219,9 +272,21 @@ def build_report(
 ) -> dict[str, Any]:
     """Durable identity of what was evaluated, against what, with what result.
     testing.md's 'Layer 3 report' is this document, not a scrollback."""
+    commit, dirty = _git_state()
+    reported_models = sorted(
+        {
+            a.get("reported_model")
+            for r in results
+            for run in r.runs
+            for a in run.attempts
+            if a.get("reported_model")
+        }
+    )
     return {
         "generated_at": datetime.now(UTC).isoformat(),
-        "commit": _git_commit(),
+        "commit": commit,
+        "worktree_dirty": dirty,
+        "provider_reported_models": reported_models,
         "corpus": {
             "path": corpus_path,
             "sha256": hashlib.sha256(corpus_raw.encode()).hexdigest()[:16],
@@ -239,6 +304,7 @@ def build_report(
                 "name": r.name,
                 "passed": r.passed,
                 "notes": r.notes,
+                "household_hash": r.household_hash,
                 "runs": [
                     {
                         "resolution": run.resolution,
@@ -248,6 +314,7 @@ def build_report(
                         "latency_ms": run.latency_ms,
                         "tokens_in": run.tokens_in,
                         "tokens_out": run.tokens_out,
+                        "attempts": run.attempts,
                     }
                     for run in r.runs
                 ],

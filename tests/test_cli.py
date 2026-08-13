@@ -219,3 +219,32 @@ def test_review_pending_remote_transport_error_is_sanitized(env, monkeypatch):
     assert result.exit_code == 1
     assert "ConnectError" in result.output
     assert "apikey" not in result.output
+
+
+def test_eval_report_defaults_to_data_volume(tmp_path, monkeypatch):
+    """Round-5 review: in-cluster the rootfs is read-only and only the data
+    volume is writable — a CWD-relative report default would spend the model
+    budget and then crash on save. The default must derive from db_path."""
+    import json as _json
+
+    from resolute.cli import app as cli_app
+
+    household = tmp_path / "household.md"
+    household.write_text("prose\n")
+    cases = tmp_path / "cases.json"
+    cases.write_text(_json.dumps({"cases": [], "invariants": []}))
+    data_dir = tmp_path / "data-volume"
+    data_dir.mkdir()
+    env = {
+        "RESOLUTE_DB_PATH": str(data_dir / "resolute.db"),
+        "RESOLUTE_HOUSEHOLD_POLICY_PATH": str(household),
+        "RESOLUTE_JUDGE__ENABLED": "true",
+    }
+    monkeypatch.chdir(tmp_path)  # CWD is NOT writable-adjacent in-cluster
+    result = runner.invoke(cli_app, ["eval", "--cases", str(cases)], env=env)
+    assert result.exit_code == 0, result.output
+    reports = list((data_dir / "eval-reports").glob("eval-*.json"))
+    assert len(reports) == 1  # landed on the data volume, not CWD
+    report = _json.loads(reports[0].read_text())
+    assert report["summary"]["cases_total"] == 0
+    assert report["household_hash"]
