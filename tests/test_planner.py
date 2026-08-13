@@ -1,4 +1,4 @@
-from resolute.engine.guardrails import GuardrailResult
+from resolute.engine.rails import RailsResult
 from resolute.schemas import (
     ActionType,
     Confidence,
@@ -13,7 +13,7 @@ PROFILES = {"profile_name_1080p": "HD-1080p", "profile_name_2160p": "Ultra-HD"}
 
 
 def _result(resolution=Resolution.P2160, confidence=Confidence.HIGH, **kwargs):
-    return GuardrailResult(resolution=resolution, confidence=confidence, **kwargs)
+    return RailsResult(resolution=resolution, confidence=confidence, **kwargs)
 
 
 def _evidence_with_request(**kwargs) -> EvidenceBundle:

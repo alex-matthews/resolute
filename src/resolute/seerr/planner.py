@@ -6,7 +6,7 @@ actually runs based on the automation mode and write switches.
 
 from __future__ import annotations
 
-from ..engine.guardrails import GuardrailResult
+from ..engine.rails import RailsResult
 from ..schemas import Action, ActionType, EvidenceBundle, Resolution
 
 
@@ -27,7 +27,7 @@ def _fallback_action(resolution: Resolution) -> ActionType:
 
 
 def build_action_plan(
-    result: GuardrailResult,
+    result: RailsResult,
     evidence: EvidenceBundle,
     *,
     profile_name_1080p: str,
@@ -118,7 +118,7 @@ def build_action_plan(
 
 
 def shadow_delta(
-    result: GuardrailResult,
+    result: RailsResult,
     evidence: EvidenceBundle,
     *,
     profile_name_1080p: str,

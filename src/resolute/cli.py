@@ -1,4 +1,4 @@
-"""CLI: same decision engine as the API, plus calibration and ops helpers."""
+"""CLI: same decision engine as the API, plus shadow-review and ops helpers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from .config import load_policy, load_settings
+from .config import load_household_policy, load_settings
 from .engine.engine import DecisionEngine
 from .metadata.source import FixtureEvidenceSource
 from .schemas import (
@@ -30,17 +30,17 @@ _fixtures_option = typer.Option(
 
 
 def _build(config: str | None, fixtures: str | None):
-    """Build (settings, policy, engine, store): live by default, offline with --fixtures."""
+    """Build (settings, household, engine, store): live by default, offline with --fixtures."""
     if fixtures:
         settings = load_settings(config)
-        policy = load_policy(settings.policy_path)
-        engine = DecisionEngine(settings, policy, FixtureEvidenceSource(fixtures))
+        household = load_household_policy(settings.household_policy_path)
+        engine = DecisionEngine(settings, household, FixtureEvidenceSource(fixtures))
         store = Store(settings.db_path)
-        return settings, policy, engine, store
+        return settings, household, engine, store
     from .runtime import build_runtime
 
     rt = build_runtime(config)
-    return rt.settings, rt.policy, rt.engine, rt.store
+    return rt.settings, rt.household, rt.engine, rt.store
 
 
 def _print_decision(decision: Decision, as_json: bool) -> None:
@@ -398,20 +398,14 @@ def feedback(
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
 ) -> None:
-    """Record household feedback on a decision (e.g. `feedback last prefer_2160p --reason-tag showcase`)."""
-    _, policy, _, store = _build(config, fixtures)
+    """Record household feedback on a decision; the shadow-mode signal for editing the household prose."""
+    _, _, _, store = _build(config, fixtures)
     if decision_id == "last":
         last = store.last_decision()
         if last is None:
             typer.echo("no decisions recorded yet", err=True)
             raise typer.Exit(1)
         decision_id = last.decision_id
-    if reason_tag and reason_tag not in policy.feedback_reason_tags:
-        typer.echo(
-            f"unknown reason tag '{reason_tag}'; allowed: {policy.feedback_reason_tags}",
-            err=True,
-        )
-        raise typer.Exit(1)
     record = store.save_feedback(
         FeedbackIn(
             decision_id=decision_id,
@@ -429,7 +423,7 @@ def calibrate(
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
 ) -> None:
-    """Print the calibration summary (decision mix, agreement rate, override clusters)."""
+    """Print the shadow-review summary (decision mix, model/household agreement rate)."""
     _, _, _, store = _build(config, fixtures)
     typer.echo(json.dumps(store.calibration_summary(), indent=2))
 
@@ -440,7 +434,7 @@ def review_overrides(
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
 ) -> None:
-    """List decisions the household disagreed with, newest first."""
+    """List decisions the household disagreed with, newest first — where the\n    prose needs editing (ADR-0003: shadow mode is the calibration method)."""
     _, _, _, store = _build(config, fixtures)
     rows = store.overrides(limit=limit)
     if not rows:
@@ -460,13 +454,24 @@ def fixtures_test(
     golden: str = typer.Option("fixtures/golden/expectations.json", "--golden"),
     config: str | None = _config_option,
 ) -> None:
-    """Run golden expectations against fixture evidence. Exit 1 on any mismatch."""
+    """Run golden expectations against fixture evidence. Exit 1 on any mismatch.
+
+    v2 (ADR-0003): golden cases are pipeline regressions, not a taste oracle.
+    A case with a canned "verdict" runs it through the rails and planner; a
+    case without one exercises the metadata floor / conservative fallback."""
+    from .judge.judge import Judge
+    from .judge.provider import StaticProvider
+
     settings = load_settings(config)
-    policy = load_policy(settings.policy_path)
-    engine = DecisionEngine(settings, policy, FixtureEvidenceSource(fixtures))
+    household = load_household_policy(settings.household_policy_path)
     cases = json.loads(Path(golden).read_text())
     failures = 0
     for case in cases:
+        canned = case.get("verdict")
+        judge = Judge(StaticProvider([json.dumps(canned)])) if canned else None
+        engine = DecisionEngine(
+            settings, household, FixtureEvidenceSource(fixtures), judge=judge
+        )
         request = DecisionRequest(**case["request"])
         decision = engine.decide(request, AutomationMode.SHADOW)
         expected = Resolution(case["expected_resolution"])
@@ -513,7 +518,7 @@ def serve(
 
     rt = build_runtime(config)
     api = create_app(
-        rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr, rt.sonarr
+        rt.settings, rt.household, rt.engine, rt.store, rt.executor, rt.seerr, rt.sonarr
     )
     bind_host = host or rt.settings.listen_host
     log_level = rt.settings.log_level.lower()

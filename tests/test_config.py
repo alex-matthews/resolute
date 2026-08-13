@@ -37,19 +37,32 @@ def test_non_auto_modes_need_no_webhook_secret(mode):
     assert settings.mode is mode
 
 
-def test_load_policy_missing_is_default_for_adhoc_use(tmp_path):
-    from resolute.config import Policy, load_policy
+def test_load_household_missing_is_empty_for_adhoc_use(tmp_path):
+    from resolute.config import HouseholdPolicy, load_household_policy
 
-    policy = load_policy(tmp_path / "missing.yaml")
-    assert policy == Policy()
+    household = load_household_policy(tmp_path / "missing.md")
+    assert household == HouseholdPolicy()
+    assert household.prose == ""
 
 
-def test_load_policy_required_fails_fast_when_absent(tmp_path):
-    """Production serve path: the image ships no policy file, so a missing
-    file means the ConfigMap mount is broken — never silently default."""
+def test_load_household_required_fails_fast_when_absent(tmp_path):
+    """Production serve path: the image ships no household file, so a missing
+    file means the Secret mount is broken — never silently decide without
+    the household voice (ADR-0003)."""
     import pytest
 
-    from resolute.config import load_policy
+    from resolute.config import load_household_policy
 
-    with pytest.raises(FileNotFoundError, match="resolute-policy"):
-        load_policy(tmp_path / "missing.yaml", required=True)
+    with pytest.raises(FileNotFoundError, match="resolute-household"):
+        load_household_policy(tmp_path / "missing.md", required=True)
+
+
+def test_household_prose_loads_and_hashes(tmp_path):
+    from resolute.config import load_household_policy
+
+    path = tmp_path / "household.md"
+    path.write_text("Nature docs deserve 4K.\n")
+    household = load_household_policy(path)
+    assert "Nature docs" in household.prose
+    assert household.source_path == str(path)
+    assert len(household.content_hash) == 16

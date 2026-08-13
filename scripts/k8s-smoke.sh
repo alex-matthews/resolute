@@ -38,7 +38,7 @@ docker run -d --name "$NAME" \
   --security-opt no-new-privileges \
   -e HOME=/nonexistent \
   -v "$tmp/data:/data" \
-  -v "$PWD/config/policy.example.yaml:/config/policy.yaml:ro" \
+  -v "$PWD/config/household.example.md:/config/household.md:ro" \
   -p "127.0.0.1:$PORT:8080" \
   "$IMAGE" >/dev/null
 

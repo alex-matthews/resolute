@@ -22,7 +22,9 @@ execute_token: ""
 api_token: ""
 
 db_path: data/resolute.db
-policy_path: config/policy.yaml
+# Household preference prose (ADR-0003). Sensitive: mount from a Secret,
+# not a git ConfigMap — it names household members. See household.example.md.
+household_policy_path: config/household.md
 
 listen_host: 0.0.0.0
 listen_port: 8080     # /metrics runs on its own listener (metrics_port: 8081)
@@ -48,14 +50,16 @@ sonarr:
   url: http://sonarr.default.svc.cluster.local
   api_key: ""            # optional; enables shadow-delta, audit, and fallback planning
 
+# The primary decision model (ADR-0003). With this disabled or unreachable,
+# resolute runs degraded: every normal decision becomes the conservative
+# fallback (1080p + hold, no writes). There is no deterministic engine.
 judge:
-  enabled: false          # deterministic-only until you opt in
+  enabled: false          # enable for normal operation; off = degraded fallback
   provider: openai_compat # any OpenAI-compatible gateway (LiteLLM recommended)
   base_url: http://litellm.default.svc.cluster.local/v1
   api_key: ""
   model: claude-haiku-4-5
   timeout_seconds: 30
-  judge_ambiguous_only: true  # only consult the model inside the ambiguous score band
 
 # ADR-0002 downgrade executor (Costanza retention seam). Report-only until
 # admin_confirm_enabled AND allow_writes are both true.
