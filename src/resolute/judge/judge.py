@@ -11,8 +11,8 @@ import time
 from pydantic import ValidationError
 
 from ..config import Policy
-from ..schemas import EvidenceBundle, ModelInvolvement, ModelVerdict
 from ..engine.policy import PreScore
+from ..schemas import EvidenceBundle, ModelInvolvement, ModelVerdict
 from .prompts import PROMPT_VERSION, SYSTEM_PROMPT, USER_TEMPLATE
 from .provider import JudgeProvider, ProviderError
 
@@ -24,8 +24,7 @@ def _extract_json(text: str) -> str:
     text = text.strip()
     if text.startswith("```"):
         text = text.strip("`")
-        if text.startswith("json"):
-            text = text[4:]
+        text = text.removeprefix("json")
     start, end = text.find("{"), text.rfind("}")
     if start >= 0 and end > start:
         return text[start : end + 1]

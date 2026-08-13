@@ -118,11 +118,14 @@ def create_app(
         @app.middleware("http")
         async def require_api_token(request: Request, call_next):
             path = request.url.path
-            if path.startswith("/api/") and path != "/api/webhooks/seerr":
-                if not _token_matches(
+            if (
+                path.startswith("/api/")
+                and path != "/api/webhooks/seerr"
+                and not _token_matches(
                     request.headers.get("X-Resolute-Api-Token"), settings.api_token
-                ):
-                    return JSONResponse({"detail": "invalid api token"}, status_code=401)
+                )
+            ):
+                return JSONResponse({"detail": "invalid api token"}, status_code=401)
             return await call_next(request)
 
     def _decide_and_store(request: DecisionRequest, mode: AutomationMode | None) -> Decision:

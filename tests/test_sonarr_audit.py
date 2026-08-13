@@ -1,7 +1,7 @@
+from conftest import load_fixture
+
 from resolute.schemas import Resolution, SonarrState
 from resolute.sonarr.audit import audit_series_profile, sonarr_state_from_series
-
-from conftest import load_fixture
 
 PROFILES = {"profile_name_1080p": "HD-1080p", "profile_name_2160p": "Ultra-HD"}
 PROFILES_BY_ID = {6: "HD-1080p", 5: "Ultra-HD"}

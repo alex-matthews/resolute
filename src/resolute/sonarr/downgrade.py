@@ -68,9 +68,8 @@ def profile_allows_resolution(profile: dict, resolution: int) -> bool:
             if quality is not None:
                 if allowed and quality.get("resolution") == resolution:
                     return True
-            elif item.get("items"):
-                if walk(item["items"], allowed):
-                    return True
+            elif item.get("items") and walk(item["items"], allowed):
+                return True
         return False
 
     return walk(profile.get("items") or [], False)

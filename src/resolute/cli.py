@@ -202,7 +202,12 @@ def downgrade(
     """ADR-0002 reclaim-to-1080p. Reports by default; --execute requires
     allow_writes AND downgrade.admin_confirm_enabled (both ship off)."""
     from .runtime import build_runtime
-    from .sonarr.downgrade import DowngradeBlocked, DowngradeHandoff, execute_downgrade, plan_downgrade
+    from .sonarr.downgrade import (
+        DowngradeBlocked,
+        DowngradeHandoff,
+        execute_downgrade,
+        plan_downgrade,
+    )
 
     rt = build_runtime(config)
     if rt.sonarr is None:
@@ -503,8 +508,8 @@ def serve(
 
     import uvicorn
 
-    from .runtime import build_runtime
     from .api.app import create_app, create_metrics_app
+    from .runtime import build_runtime
 
     rt = build_runtime(config)
     api = create_app(

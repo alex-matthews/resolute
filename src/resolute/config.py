@@ -187,7 +187,7 @@ class Settings(BaseSettings):
     downgrade: DowngradeSettings = Field(default_factory=DowngradeSettings)
 
     @model_validator(mode="after")
-    def _auto_writes_require_webhook_secret(self) -> "Settings":
+    def _auto_writes_require_webhook_secret(self) -> Settings:
         """Auto modes execute writes from the webhook path, so an unauthenticated
         webhook plus auto writes would be an open write-capable endpoint.
         Refuse the combination outright rather than trusting deployment topology."""

@@ -39,3 +39,7 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py314"
+
+[tool.ruff.lint.flake8-bugbear]
+# typer's documented CLI pattern puts Option()/Argument() in parameter defaults.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]

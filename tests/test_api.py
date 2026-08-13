@@ -1,13 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
+from test_executor import FakeSeerr, FakeSonarr
 
 from resolute.api.app import create_app, create_metrics_app
 from resolute.engine.engine import DecisionEngine
 from resolute.executor import Executor
 from resolute.schemas import AutomationMode
-
-from test_executor import FakeSeerr, FakeSonarr
-
 
 OPERATOR_TOKEN = "test-operator-token"
 
@@ -464,6 +462,7 @@ def test_objective_worth_unavailable_degrades(settings, policy, evidence_source,
 
 def test_downgrade_plan_endpoint_is_read_only(settings, policy, evidence_source, store):
     from test_downgrade import SERIES, FakeDowngradeSonarr
+
     from resolute.api.app import create_app
     from resolute.engine.engine import DecisionEngine
 
@@ -484,6 +483,7 @@ def test_downgrade_plan_endpoint_is_read_only(settings, policy, evidence_source,
 
 def test_downgrade_execute_endpoint_gates(settings, policy, evidence_source, store):
     from test_downgrade import SERIES, FakeDowngradeSonarr
+
     from resolute.api.app import create_app
     from resolute.engine.engine import DecisionEngine
 
