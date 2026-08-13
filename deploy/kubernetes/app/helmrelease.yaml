@@ -27,17 +27,19 @@ spec:
             env:
               TZ: Pacific/Auckland
               RESOLUTE_MODE: shadow          # rollout: shadow -> recommend -> approve
-              RESOLUTE_ALLOW_WRITES: "false" # master write switch; keep false until docs/rollout.md phase 3
+              RESOLUTE_ALLOW_WRITES: "false" # master write switch; keep false until docs/rollout.md phase 2 (approve)
               RESOLUTE_AUTO_APPROVE_ENABLED: "false"
               RESOLUTE_DB_PATH: /data/resolute.db
-              RESOLUTE_POLICY_PATH: /config/policy.yaml
+              RESOLUTE_HOUSEHOLD_POLICY_PATH: /config/household.md
               # Ports follow the config defaults (org convention): app 8080,
               # /metrics on its own 8081 listener. No override needed.
               RESOLUTE_SEERR__URL: http://seerr.default.svc.cluster.local
               RESOLUTE_SONARR__URL: http://sonarr.default.svc.cluster.local
               RESOLUTE_SEERR__PROFILE_NAME_1080P: HD-1080p   # match your Sonarr profile names exactly
               RESOLUTE_SEERR__PROFILE_NAME_2160P: Ultra-HD
-              RESOLUTE_JUDGE__ENABLED: "false"
+              # ADR-0003: the model IS the engine; disabled = degraded fallback
+              # (every decision holds at 1080p). Enable for real shadow data.
+              RESOLUTE_JUDGE__ENABLED: "true"
               RESOLUTE_JUDGE__BASE_URL: http://litellm.default.svc.cluster.local/v1
             envFrom:
               - secretRef:
@@ -131,14 +133,14 @@ spec:
           resolute:
             app:
               - path: /data
-      policy:
-        type: configMap
-        name: resolute-policy
+      household:
+        type: secret
+        name: resolute-household-secret
         advancedMounts:
           resolute:
             app:
-              - path: /config/policy.yaml
-                subPath: policy.yaml
+              - path: /config/household.md
+                subPath: household.md
                 readOnly: true
       tmpfs:
         type: emptyDir
