@@ -42,7 +42,7 @@ def test_decide_offline_degrades_without_model(env, fixtures_dir):
     result = _decide(env, fixtures_dir)
     assert result.exit_code == 0, result.output
     assert "1080p" in result.output
-    assert "mode=shadow" in result.output
+    assert "mode     : shadow" in result.output
 
 
 def test_decide_json_output(env, fixtures_dir):

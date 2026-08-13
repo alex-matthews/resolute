@@ -585,3 +585,66 @@ def test_downgrade_execute_endpoint_gates(settings, policy, evidence_source, sto
     # live reconciliation: profile on target, 2160p resident, nothing queued
     assert record["reconciliation"]["outcome"] == "pending"
     assert client.get("/api/downgrades/nope").status_code == 404
+
+
+def test_objective_worth_audits_even_on_provider_explosion(
+    settings, policy, evidence_source, store
+):
+    """Adversarial review #3: an unexpected provider exception must degrade to
+    unavailable (never HTTP 500) and still leave an inference-audit row."""
+    from resolute.api.app import create_app
+    from resolute.engine.engine import DecisionEngine
+    from resolute.judge.judge import Judge
+
+    class ExplodingProvider:
+        name = "boom"
+        model = "boom-test"
+
+        def complete_json(self, system, user):
+            raise RuntimeError("socket weirdness")
+
+    engine = DecisionEngine(
+        settings, policy, evidence_source, judge=Judge(ExplodingProvider())
+    )
+    client = TestClient(
+        create_app(settings, policy, engine, store, None, seerr=WorthSeerr(), sonarr=WorthSonarr())
+    )
+    response = client.get("/api/titles/371980/objective-worth")
+    assert response.status_code == 200
+    assert response.json()["worth"] == "unavailable"
+    assert len(_audit_rows(store)) == 1
+
+
+def test_stored_v1_decision_round_trips(store):
+    """Adversarial review #8: a realistic judge_v1-era record must parse, save,
+    and serve through the store and API paths under the v2 schema."""
+    from resolute.schemas import Decision
+
+    v1_json = {
+        "decision_id": "01V1RECORD000000000000000",
+        "request": {"title": "Old Show", "tmdb_id": 111, "trigger": "seerr_webhook"},
+        "evidence": {"facts": {"canonical_title": "Old Show", "genres": ["Drama"]}},
+        "title": "Old Show",
+        "objective": {"resolution": "2160p", "confidence": "medium", "reasons": ["r"]},
+        "household": {"resolution": "2160p", "confidence": "medium", "reasons": ["r"]},
+        "final_resolution": "2160p",
+        "confidence": "medium",
+        "score": 3.75,
+        "score_components": [
+            {"name": "visual_genre", "contribution": 1.6, "note": "v1 weighted term"}
+        ],
+        "model_involvement": {
+            "used": True,
+            "provider": "openai_compat",
+            "prompt_version": "judge_v1",
+            "raw_output": "{}",
+        },
+    }
+    decision = Decision.model_validate(v1_json)
+    assert decision.score == 3.75
+    assert decision.model_involvement.household_hash is None
+    assert decision.model_involvement.attempts == []
+    assert decision.evidence.diskspace == []
+    store.save_decision(decision)
+    assert store.get_decision(decision.decision_id).score == 3.75
+    assert store.list_decisions()[0].decision_id == decision.decision_id

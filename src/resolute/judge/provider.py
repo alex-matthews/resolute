@@ -40,6 +40,11 @@ class OpenAICompatProvider:
             headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
         )
 
+    # A syntactically valid HTTP response can still carry a malformed body
+    # (content: null, non-string content, absurd size). All of those must
+    # surface as ProviderError so the caller's fallback path runs.
+    _MAX_RESPONSE_CHARS = 50_000
+
     def complete_json(self, system: str, user: str) -> str:
         try:
             response = self._client.post(
@@ -55,9 +60,14 @@ class OpenAICompatProvider:
                 },
             )
             response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
+            content = response.json()["choices"][0]["message"]["content"]
+        except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as exc:
             raise ProviderError(f"model call failed: {exc}") from exc
+        if not isinstance(content, str):
+            raise ProviderError(
+                f"model returned non-string content ({type(content).__name__})"
+            )
+        return content[: self._MAX_RESPONSE_CHARS]
 
 
 class StaticProvider:

@@ -51,7 +51,9 @@ def _print_decision(decision: Decision, as_json: bool) -> None:
     typer.echo(f"title    : {decision.title} ({decision.year})")
     typer.echo(f"final    : {decision.final_resolution}  confidence={decision.confidence}")
     typer.echo(f"objective: {decision.objective.resolution}  household: {decision.household.resolution}")
-    typer.echo(f"score    : {decision.score}  mode={decision.mode}")
+    typer.echo(f"mode     : {decision.mode}")
+    if decision.score:  # v1 records only; v2 decisions carry no score
+        typer.echo(f"score    : {decision.score} (v1 deterministic record)")
     if decision.risk_flags:
         typer.echo(f"risks    : {', '.join(decision.risk_flags)}")
     if decision.shadow_delta:
@@ -73,7 +75,6 @@ def decide(
     requester: str | None = typer.Option(None),
     tmdb_id: int | None = typer.Option(None),
     mode: AutomationMode | None = typer.Option(None),
-    force_judge: bool = typer.Option(False, help="Consult the LLM judge even if unambiguous"),
     as_json: bool = typer.Option(False, "--json"),
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
@@ -87,7 +88,6 @@ def decide(
         requester=requester,
         tmdb_id=tmdb_id,
         trigger=TriggerSource.MANUAL_CLI,
-        force_judge=force_judge,
     )
     decision = engine.decide(request, mode)
     store.save_decision(decision)

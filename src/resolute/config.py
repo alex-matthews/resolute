@@ -88,6 +88,9 @@ class JudgeSettings(BaseModel):
     api_key: str = ""
     model: str = "claude-haiku-4-5"
     timeout_seconds: float = 30.0
+    # v1 relic, accepted and ignored: a deployed RESOLUTE_JUDGE__JUDGE_AMBIGUOUS_ONLY
+    # or config-file key must not crash startup on upgrade (extra="forbid" would).
+    judge_ambiguous_only: bool | None = None
 
 
 class Settings(BaseSettings):

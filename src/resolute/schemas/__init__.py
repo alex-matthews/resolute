@@ -7,7 +7,14 @@ from .core import (
     Resolution,
     TriggerSource,
 )
-from .decision import Action, Decision, ModelInvolvement, Recommendation, ScoreComponent
+from .decision import (
+    Action,
+    Decision,
+    ModelAttempt,
+    ModelInvolvement,
+    Recommendation,
+    ScoreComponent,
+)
 from .evidence import DiskMount, EvidenceBundle, SeerrRequestState, ShowFacts, SonarrState
 from .feedback import FeedbackIn, FeedbackRecord
 from .request import DecisionRequest
@@ -33,6 +40,7 @@ __all__ = [
     "FeedbackIn",
     "FeedbackRecord",
     "FeedbackVerdict",
+    "ModelAttempt",
     "ModelInvolvement",
     "ModelVerdict",
     "ObjectiveVerdict",

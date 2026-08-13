@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .core import ActionType, Confidence, Resolution
+
+# Model-supplied strings are rendered downstream (CLI, API consumers, Costanza
+# evidence bullets). Length caps bound what a hostile overview can smuggle
+# through them; escaping stays the presentation layer's job.
+Reason = Annotated[str, StringConstraints(max_length=300)]
+Flag = Annotated[str, StringConstraints(max_length=64)]
 
 
 class VerdictLane(BaseModel):
@@ -12,7 +20,7 @@ class VerdictLane(BaseModel):
 
     resolution: Resolution
     confidence: Confidence
-    reasons: list[str] = Field(min_length=1, max_length=8)
+    reasons: list[Reason] = Field(min_length=1, max_length=8)
 
 
 class VerdictAutomation(BaseModel):
@@ -32,8 +40,8 @@ class ModelVerdict(BaseModel):
     objective: VerdictLane
     household: VerdictLane
     automation: VerdictAutomation
-    risk_flags: list[str] = Field(default_factory=list, max_length=8)
-    questions: list[str] = Field(default_factory=list, max_length=4)
+    risk_flags: list[Flag] = Field(default_factory=list, max_length=8)
+    questions: list[Reason] = Field(default_factory=list, max_length=4)
 
 
 class ObjectiveVerdict(BaseModel):
@@ -44,7 +52,7 @@ class ObjectiveVerdict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     objective: VerdictLane
-    risk_flags: list[str] = Field(default_factory=list, max_length=8)
+    risk_flags: list[Flag] = Field(default_factory=list, max_length=8)
 
 
 MODEL_VERDICT_JSON_SCHEMA = ModelVerdict.model_json_schema()

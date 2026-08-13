@@ -41,6 +41,17 @@ class Action(BaseModel):
         return self.type in WRITE_ACTIONS
 
 
+class ModelAttempt(BaseModel):
+    """One provider call within an inference: ADR-0003's audit rationale
+    requires every attempt's raw output, not just the last one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    raw_output: str | None = None
+    error: str | None = None
+    latency_ms: int | None = None
+
+
 class ModelInvolvement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -52,9 +63,11 @@ class ModelInvolvement(BaseModel):
     # Fingerprint of the household prose the decision was made under (ADR-0003);
     # the prose itself is sensitive and never stored.
     household_hash: str | None = None
+    # Final-attempt raw output (v1-compatible field); attempts carries all.
     raw_output: str | None = None
     error: str | None = None
     latency_ms: int | None = None
+    attempts: list[ModelAttempt] = Field(default_factory=list)
 
 
 class Decision(BaseModel):

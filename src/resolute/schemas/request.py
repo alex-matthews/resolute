@@ -29,6 +29,8 @@ class DecisionRequest(BaseModel):
     seerr_request_id: int | None = None
 
     # Force the LLM judge even when the deterministic band is unambiguous.
+    # Deprecated no-op (ADR-0003): the model judges every non-floor case, so
+    # there is no ambiguity gate to force past. Accepted for API compatibility.
     force_judge: bool = False
 
     def identity_hint(self) -> str:

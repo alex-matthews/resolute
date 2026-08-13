@@ -66,3 +66,22 @@ def test_household_prose_loads_and_hashes(tmp_path):
     assert "Nature docs" in household.prose
     assert household.source_path == str(path)
     assert len(household.content_hash) == 16
+
+
+def test_stale_v1_judge_env_does_not_crash_startup(monkeypatch):
+    """Adversarial review #2: an upgraded pod carrying the deployed v1 setting
+    RESOLUTE_JUDGE__JUDGE_AMBIGUOUS_ONLY must boot, not ValidationError."""
+    from resolute.config import Settings, load_settings
+
+    monkeypatch.setenv("RESOLUTE_JUDGE__JUDGE_AMBIGUOUS_ONLY", "true")
+    settings = load_settings()
+    assert isinstance(settings, Settings)
+
+
+def test_stale_v1_judge_yaml_key_does_not_crash(tmp_path):
+    from resolute.config import load_settings
+
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("judge:\n  enabled: false\n  judge_ambiguous_only: true\n")
+    settings = load_settings(cfg)
+    assert settings.judge.enabled is False

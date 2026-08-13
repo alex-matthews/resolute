@@ -60,7 +60,9 @@ class DecisionEngine:
             if self.judge is None:
                 result = conservative_fallback("model disabled in settings")
             else:
-                verdict, involvement = self.judge.judge_request(evidence, self.household)
+                verdict, involvement = self.judge.judge_request(
+                    evidence, self.household, requester=request.requester
+                )
                 if verdict is not None:
                     result = apply_rails(verdict, gaps)
                 else:
