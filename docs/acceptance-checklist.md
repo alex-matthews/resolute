@@ -17,7 +17,7 @@ From the cleansheet design + handoff. Verification commands assume
 - [x] Shadow mode compares recommendation vs current Sonarr/Seerr state without
       writing (`shadow_delta`, `tests/test_planner.py::test_shadow_delta_*`)
 - [x] Feedback ingestion via CLI and API, recorded durably and used in
-      calibration summaries
+      shadow-review summaries
 - [x] Result is presentable to any human-facing adapter (title, resolution,
       confidence, top reasons, risk flags, feedback options)
 - [x] ADR-0002 Costanza seam: objective-worth read endpoint (pure, degrades to

@@ -25,11 +25,9 @@ curl -s -X POST localhost:8080/api/decisions \
                 "reasons": ["genre/keywords suggest strong visual payoff",
                              "premium network/platform production values"]},
   "household": {"resolution": "2160p", "confidence": "high", "reasons": ["..."]},
-  "score": 4.0,
   "top_reasons": [
-    "genre/keywords suggest strong visual payoff",
-    "premium network/platform production values",
-    "widely acclaimed title"
+    "prestige sci-fi with a real UHD master",
+    "household prose favors showcase quality here"
   ],
   "risk_flags": [],
   "metadata_gaps": [],
@@ -42,12 +40,15 @@ curl -s -X POST localhost:8080/api/decisions \
   ],
   "shadow_delta": null,
   "feedback_options": ["agree", "prefer_1080p", "prefer_2160p", "manual_review"],
-  "model_involvement": {"used": false}
+  "model_involvement": {"used": true, "provider": "openai_compat",
+                        "model": "claude-haiku-4-5", "prompt_version": "judge_v2"}
 }
 ```
 
 (Response truncated: the full body also carries `request`, `evidence`,
-`score_components`, and `verdict` for auditability.)
+`verdict`, and `model_involvement` — provider, model, prompt version,
+evidence/household hashes, raw output, latency — for auditability. v1's
+`score`/`score_components` remain readable on stored v1 decisions.)
 
 ## Seerr webhook (what Seerr sends)
 
@@ -158,24 +159,20 @@ curl -s localhost:8080/api/calibration/summary
 #     "agreement_rate": 0.85}
 ```
 
-## Objective worth (ADR-0002, Costanza evidence read)
+## Objective worth (ADR-0002 seam, model-derived per ADR-0003)
 
 ```bash
 curl -s localhost:8080/api/titles/371980/objective-worth
 # -> {"tvdb_id": 371980, "tmdb_id": 95396, "title": "Severance",
-#     "worth": "2160p", "objective_score": 3.1, "confidence": "medium",
-#     "reasons": ["genre/keywords suggest strong visual payoff", ...],
-#     "metadata_gaps": []}
-# unresolvable ids degrade instead of erroring:
+#     "worth": "2160p", "confidence": "high",
+#     "reasons": ["prestige production with a true UHD master", ...],
+#     "risk_flags": []}
+# The invocation is objective-only by contract: no household prose, requester,
+# or storage context can reach this prompt. Records no decision; every call
+# appends an inference-audit row. v1's numeric objective_score was removed at
+# the v2 cutover (ADR-0003; Costanza ADR-0011 amended to match).
+# Unresolvable ids AND model failures degrade instead of erroring:
 # -> {"tvdb_id": 999, "worth": "unavailable", "reason": "..."}
-#
-# DEPRECATED at the v2 cutover (ADR-0003): `objective_score` is a v1 weighted
-# sum whose semantics do not survive the LLM-primary pivot; it is REMOVED, not
-# re-derived, when v2 lands. Consumers must use the categorical fields —
-# `worth`, `confidence`, `reasons` — which are retained unchanged, as is the
-# `worth: unavailable` degradation (which will then also cover model
-# unavailability). See docs/adr/0003-llm-primary-decision-engine.md and the
-# amendment to Costanza ADR-0011.
 ```
 
 ## Downgrade (ADR-0002, report-only by default)

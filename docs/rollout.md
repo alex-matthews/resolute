@@ -17,25 +17,29 @@ Writes are earned, not assumed. Each phase has an explicit exit criterion.
 
 ## Phase 1 — shadow (no writes, weeks 1–2)
 
-- Deploy with `mode: shadow`, `allow_writes: false`, judge disabled.
+Shadow mode **is** the calibration method in v2 (ADR-0003): there are no
+weights to tune, only prose to edit.
+
+- Deploy with `mode: shadow`, `allow_writes: false`, and the model
+  **enabled** (`judge.enabled: true` pointing at LiteLLM) — with the model
+  off, every decision is just the conservative 1080p hold and shadow data is
+  meaningless. Mount the household prose (see `config/household.example.md`).
 - Configure the Seerr webhook (see README) for "Request Pending Approval".
 - Humans keep approving requests in Seerr exactly as before.
-- resolute records a decision per request and a `shadow_delta` comparing its
-  recommendation to what actually happened.
-- Record feedback: `resolute feedback last agree` /
-  `prefer_1080p --reason-tag ...` after each real approval.
+- resolute records a decision per request — with the model's stated reasons —
+  and a `shadow_delta` comparing its recommendation to what actually
+  happened.
+- Record feedback: `resolute feedback last agree` / `prefer_1080p` after real
+  approvals. Read the model's reasons when you disagree.
+- Watch `model_unavailable` in risk flags and worth/latency metrics: model
+  cost and latency are on the normal path now and must stay observable.
 
 **Exit criterion:** `resolute calibrate` shows ≥ 80% agreement over at least
-15 decisions, and `review-overrides` shows no systematic cluster (if it does,
-edit `policy.yaml` weights/pins and keep shadowing).
+15 decisions, and `review-overrides` shows no systematic cluster. When a
+cluster exists, **edit the household prose** and keep shadowing — that is the
+whole tuning loop.
 
-## Phase 2 — judge calibration (optional, parallel)
-
-- Enable the judge (`judge.enabled: true`) pointing at LiteLLM; still shadow.
-- Ambiguous-band decisions now carry model verdicts; verify `model_error`
-  rate is near zero and spot-check reasons.
-
-## Phase 3 — approve (first writes)
+## Phase 2 — approve (first writes)
 
 - Set `mode: approve`, `allow_writes: true`, and a strong `execute_token`
   (HTTP execution stays disabled until the token exists).
@@ -59,16 +63,16 @@ edit `policy.yaml` weights/pins and keep shadowing).
 **Exit criterion:** ≥ 10 operator-executed decisions with zero incorrect
 profiles at the Sonarr end.
 
-## Phase 4 — auto_profile
+## Phase 3 — auto_profile
 
 - Set `mode: auto_profile`. Requires `seerr.webhook_shared_secret` — the
   service refuses to start in an auto write mode with an unauthenticated
   webhook, since that path executes writes.
-- Pending requests get their profile set automatically when guardrails pass
-  (never low-confidence, never held). Approval remains human, in Seerr,
-  where it always was.
+- Pending requests get their profile set automatically when the rails pass
+  (never low-confidence, never held, never on the model-unavailable
+  fallback). Approval remains human, in Seerr, where it always was.
 
-## Phase 5 — auto_approve (optional, opt-in)
+## Phase 4 — auto_approve (optional, opt-in)
 
 - Requires both `mode: auto_approve` **and** `auto_approve_enabled: true`.
 - Only worth it once override rate is negligible, because approval starts

@@ -17,9 +17,10 @@ Components:
   through the API. It deliberately does not mount the data PVC — the SQLite
   writer stays single (the API pod), and the endpoint only decides and
   records, never executes, so it is shadow-safe in every mode.
-- **ConfigMap** `resolute-policy` from `app/policy.yaml`: the household
-  policy. Editing it in git and letting Flux/reloader roll the pod is the
-  intended calibration loop.
+- **Secret** `resolute-household` (ExternalSecret-templated): the household
+  preference prose mounted at `/config/household.md` (ADR-0003). A Secret,
+  not a git ConfigMap, because it names household members. Editing it and
+  letting reloader roll the pod is the whole tuning loop.
 - **PVC** `resolute` (1Gi ceph-block): SQLite decision/feedback history,
   volsync-backed like other apps.
 
@@ -27,7 +28,7 @@ Components:
 
 The image is identity-agnostic (home-operations/containers precedent,
 e.g. `apps/tautulli`): it creates no user, chowns nothing, ships no
-policy file, and defaults to `nobody:nogroup` for bare runs. Storage
+household file, and defaults to `nobody:nogroup` for bare runs. Storage
 identity comes exclusively from the manifests — the cluster standard for
 stateful apps, already present in `deploy/kubernetes/app/helmrelease.yaml`:
 
@@ -50,8 +51,8 @@ securityContext:
 written as any other uid without `fsGroup` breaks backup/restore.
 `scripts/k8s-smoke.sh` (CI + `mise run k8s-smoke`) verifies the image
 under exactly these constraints: `--user 1032:100 --read-only`, no HOME,
-only /data writable, policy mounted read-only. The serve path fails fast
-if `/config/policy.yaml` is not mounted.
+only /data writable, household prose mounted read-only. The serve path
+fails fast if `/config/household.md` is not mounted.
 
 ## SQLite on volsync (backup/restore posture)
 
@@ -125,7 +126,7 @@ this repo deliberately ships no Chaski manifests to avoid guessing them.
 docker build -t resolute .
 docker run -p 8080:8080 -p 8081:8081 \
   -v resolute-data:/data \
-  -v $(pwd)/config/policy.yaml:/config/policy.yaml:ro \
+  -v $(pwd)/config/household.md:/config/household.md:ro \
   -e RESOLUTE_SEERR__URL=http://seerr.local \
   -e RESOLUTE_SEERR__API_KEY=... \
   -e RESOLUTE_SONARR__URL=http://sonarr.local \

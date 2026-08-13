@@ -2,9 +2,10 @@
 
 Seerr-first TV resolution policy engine for a home media stack. When a TV
 request lands in Seerr, resolute decides whether it should use the existing
-**1080p** or **2160p** Sonarr quality profile — using deterministic metadata
-scoring, household policy, and an optional schema-validated LLM judge — and
-produces a Seerr request/profile action plan. It ships in **shadow mode**: it
+**1080p** or **2160p** Sonarr quality profile — an LLM judges the trusted
+evidence against the household's written preferences, inside a strict schema
+and a small set of hard safety rails (ADR-0003) — and produces a Seerr
+request/profile action plan. It ships in **shadow mode**: it
 recommends and records, and writes nothing until you explicitly enable it.
 
 ```text
@@ -22,11 +23,13 @@ Key properties:
   strategy (see [docs/adr/0001](docs/adr/0001-seerr-integration-strategy.md)).
 - **It selects between the two existing profiles** (externally managed by
   Recyclarr/TRaSH); it never creates or edits profile definitions.
-- **The LLM is optional and bounded**: consulted only for ambiguous cases,
-  strictly schema-validated, clamped by deterministic guardrails, fully
-  audited, and the system works with it disabled.
+- **The LLM is the decision-maker** (ADR-0003): strictly schema-validated,
+  bounded by a small set of hard rails, fully audited. With the model
+  disabled or unreachable, resolute runs degraded — every normal decision
+  becomes a conservative 1080p hold; there is no second decision engine.
 - **Every decision, feedback event, webhook, and execution is durable**
-  (SQLite on PVC) and feeds an explicit calibration loop.
+  (SQLite on PVC); shadow mode plus feedback is the calibration method —
+  disagree with a pattern, edit the household prose.
 - Standalone CLI/API/service. No Discord, no Costanza, no presentation-layer
   dependency; those can consume the API later.
 
@@ -109,35 +112,38 @@ modes also refuse to start unless the webhook shared secret is configured
 ## How decisions work
 
 1. **Evidence**: show facts via Seerr's TMDB proxy, Seerr request state,
-   Sonarr series state (if it exists). Gaps are tracked, not guessed away.
-2. **Deterministic pre-score** against the editable household policy
-   ([config/policy.example.yaml](config/policy.example.yaml)): visual-payoff
-   genres, network tier, era, acclaim, episode/storage burden, requester bias,
-   franchise pins. Two lanes: *objective* (any household) and *household*
-   (this one).
-3. **Optional LLM judge** for the ambiguous middle band — strict JSON
-   contract, one retry, fails closed to the deterministic result.
-4. **Guardrails** apply hard pins and caps, clamp the judge, and route
-   uncertain cases to `hold_for_manual_review`.
-5. **Planner** emits a Seerr-first action plan; Sonarr mutation exists only as
+   Sonarr series state (if it exists), and measured free space from Sonarr's
+   `/diskspace`. Gaps are tracked, not guessed away; both title and genres
+   missing means hold without a model call (the metadata floor).
+2. **The model decides** ([docs/adr/0003](docs/adr/0003-llm-primary-decision-engine.md)):
+   evidence plus the household-preference prose
+   ([config/household.example.md](config/household.example.md)) go to the
+   model, which returns a strict, schema-validated verdict (objective lane,
+   household lane, and a constrained automation action) — one retry, then
+   the conservative fallback (1080p + hold, no write).
+3. **Hard rails** honor model-requested holds, hold low-confidence verdicts,
+   and bound the blast radius: the model can only ever pick among trusted
+   profiles or hold.
+4. **Planner** emits a Seerr-first action plan; Sonarr mutation exists only as
    an operator-approved fallback plus a read-only audit. A separate,
    independently-gated retention seam
    ([docs/adr/0002](docs/adr/0002-downgrade-executor-and-worth-endpoint.md))
-   serves Costanza: an objective-worth read endpoint and a reclaim-to-1080p
-   executor that ships report-only.
-6. **Feedback** (`agree` / `prefer_1080p` / `prefer_2160p` / `manual_review` +
-   reason tags) accumulates for the calibration loop
-   ([docs/calibration.md](docs/calibration.md)).
+   serves Costanza: a model-derived objective-worth read (objective-only
+   invocation contract) and a reclaim-to-1080p executor that ships
+   report-only.
+5. **Feedback** (`agree` / `prefer_1080p` / `prefer_2160p` / `manual_review`)
+   accumulates as the shadow-mode signal for editing the prose
+   ([docs/rollout.md](docs/rollout.md)).
 
 ## Repository map
 
 ```text
 src/resolute/     engine, schemas, seerr/sonarr adapters, judge, store, api, cli
-tests/              139 no-network tests
+tests/              137 no-network tests
 fixtures/           seerr/sonarr payloads, evidence bundles, golden expectations
-config/             config + household policy examples
+config/             config + household prose examples
 deploy/kubernetes/  Flux/app-template manifests (home-ops style)
-docs/               architecture, ADR, rollout, deployment, calibration,
+docs/               architecture, ADRs, rollout, deployment,
                     API examples, acceptance checklist
 ```
 
