@@ -47,43 +47,50 @@ url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/3849249
 provenance = "github-attestations"
 
 [[tools.hadolint]]
-version = "2.14.0"
+version = "2.15.1"
 backend = "aqua:hadolint/hadolint"
 
 [tools.hadolint."platforms.linux-arm64"]
-checksum = "sha256:331f1d3511b84a4f1e3d18d52fec284723e4019552f4f47b19322a53ce9a40ed"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-linux-arm64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/295944081"
+checksum = "sha256:f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"
+url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64"
+url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546507"
+provenance = "github-attestations"
 
 [tools.hadolint."platforms.linux-arm64-musl"]
-checksum = "sha256:331f1d3511b84a4f1e3d18d52fec284723e4019552f4f47b19322a53ce9a40ed"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-linux-arm64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/295944081"
+checksum = "sha256:f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"
+url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64"
+url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546507"
+provenance = "github-attestations"
 
 [tools.hadolint."platforms.linux-x64"]
-checksum = "sha256:6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-linux-x86_64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/295944080"
+checksum = "sha256:c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"
+url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64"
+url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546506"
+provenance = "github-attestations"
 
 [tools.hadolint."platforms.linux-x64-musl"]
-checksum = "sha256:6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-linux-x86_64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/295944080"
+checksum = "sha256:c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"
+url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64"
+url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546506"
+provenance = "github-attestations"
 
 [tools.hadolint."platforms.macos-arm64"]
-checksum = "sha256:3625e2e9f43dcfe7bd38738a5f5520ed50ce39ed28485266e6803dd7bc197b10"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-macos-arm64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/295944077"
+checksum = "sha256:5c09f3213f8e40406abe048233d985eebef336d4a6a20021be47fadb6cf480a2"
+url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-macos-arm64"
+url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546505"
+provenance = "github-attestations"
 
 [tools.hadolint."platforms.macos-x64"]
-checksum = "sha256:2b69a853433f1eca522ffb921cd490bd1321424d03331fd8390f93b7fb4a02e9"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-macos-x86_64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/295944082"
+checksum = "sha256:ffe9bb18b23d5ed1eae50237aecdbb523d016e96da0bd4e7aa432040acfc3fde"
+url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-macos-x86_64"
+url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546509"
+provenance = "github-attestations"
 
 [tools.hadolint."platforms.windows-x64"]
-checksum = "sha256:8e0ee174f88edb14f207a68430c7a53c2883ed509cdbde9a3a26fffa140fa5e4"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-windows-x86_64.exe"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/295944079"
+checksum = "sha256:01d927294962b5387f9ead4f18679158452be4f17c765ad0bdffe5264b9c7b0a"
+url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-windows-x86_64.exe"
+url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546508"
+provenance = "github-attestations"
 
 [[tools.helm]]
 version = "4.2.3"
@@ -327,41 +334,41 @@ url_api = "https://api.github.com/repos/mikefarah/yq/releases/assets/440146721"
 provenance = "cosign"
 
 [[tools.zizmor]]
-version = "1.26.1"
+version = "1.29.0"
 backend = "aqua:zizmorcore/zizmor"
 
 [tools.zizmor."platforms.linux-arm64"]
-checksum = "sha256:711f5af366b299128f9a04b1470e37d990b41fbd21f14a1a4148d25004a83762"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.26.1/zizmor-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/453417983"
+checksum = "sha256:415eaa7c0a06479a701b8e44a3e812c1047decc848ec4bede7bd6bbf49f22d20"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263143"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.linux-arm64-musl"]
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.linux-x64"]
-checksum = "sha256:8556289a64e7aaf2400cd516f61a471aa91c5902cc56ad96a82fd12f90c2ef73"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.26.1/zizmor-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/453417985"
+checksum = "sha256:dd96df044a6e8538d5f423790f453bdd03d49e5b2bcc38214acc41a2f1297839"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263145"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.linux-x64-musl"]
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.macos-arm64"]
-checksum = "sha256:68ab2b37836bbd44f6cfffcc102b9ffffbc20c5d67d84293dafb63bd2775a1da"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.26.1/zizmor-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/453417984"
+checksum = "sha256:720322fade9e83a9c7953944c438f2ba942636b86b96a8f0e6b15ce94c8a6b6f"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263141"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.macos-x64"]
-checksum = "sha256:2967414a561f8c1264121e8f723c3b5abcf3d1bf7ce5063114df99985dd75801"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.26.1/zizmor-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/453417982"
+checksum = "sha256:648b72ab9941a7f2a8d65d7b68a8e76cef789538c8df3a3950384d38423375b0"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263144"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.windows-x64"]
-checksum = "sha256:c6cea156935e3b9d36faeca4fd8f622d23f7a7578da26adb34e6456abd9beb9a"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.26.1/zizmor-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/453417981"
+checksum = "sha256:68a6bc6888f10bf0d53658c75885e7c1b7a0588d4c1fbc3f0ca280ad7324bf06"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263142"
 provenance = "github-attestations"

@@ -3,10 +3,10 @@ python = "3.14.7"
 uv = "0.11.28"
 helm = "4.2.3"
 kubeconform = "0.8.0"
-hadolint = "2.14.0"
+hadolint = "2.15.1"
 actionlint = "1.7.12"
 shellcheck = "0.11.0"
-zizmor = "1.26.1"
+zizmor = "1.29.0"
 yq = "4.53.3"
 
 [tasks.sync]
