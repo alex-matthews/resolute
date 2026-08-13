@@ -83,9 +83,10 @@ From the cleansheet design + handoff. Verification commands assume
       planner, audit, engine, store, CLI, API, webhook, wire-level Seerr
       client, eval-harness mechanics, canned-verdict pipeline cases —
       `pytest` (run it for the current count; numbers in docs rot)
-- [x] Validation layering is explicit (docs/testing.md): CI proves safety and
-      integration; model quality is gated by `resolute eval` (live model,
-      opt-in) and shadow evidence — never by green unit tests
+- [x] Validation layering is explicit (docs/testing.md): CI proves safety
+      and integration; model quality is proven by shadow evidence on real
+      requests (`resolute eval` is an optional workstation pre-flight) —
+      never by green unit tests
 - [x] Durable decision/feedback/audit history: SQLite on PVC + JSONL export
 - [x] Dockerfile, local run commands, config examples
       (`config/*.example.yaml`), home-ops manifests (`deploy/kubernetes/`)
@@ -107,9 +108,11 @@ From the cleansheet design + handoff. Verification commands assume
 - [ ] Create the `RESOLUTE_HOUSEHOLD_PROSE` field on the `resolute` 1Password
       item and write the real household prose (config/household.example.md is
       a skeleton) — the pod fails fast without the mount
-- [ ] Review and expand `fixtures/eval/cases.json` (authored by the
-      implementing model — its acceptable-sets encode taste assumptions that
-      only the household can confirm)
-- [ ] Run `mise run eval` against the configured model; review the durable
-      report it writes (`data/eval-reports/`) before enabling the model in
-      shadow, and re-run on model/prompt/prose changes
+- [ ] Set a conservative budget/rate limit for resolute's key in LiteLLM
+      before the commit that enables the model (the budget, not hope, bounds
+      spend)
+- [ ] Optional pre-flight: review `fixtures/eval/cases.json` (authored by
+      the implementing model) and run `mise run eval` from a workstation
+      checkout against LiteLLM; it is a dev tool, not a gate
+- [ ] Enable the model + unsuspend the review CronJob in one reviewed Git
+      commit, `allow_writes` still false (docs/rollout.md phase 0.5)

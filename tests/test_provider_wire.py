@@ -124,3 +124,34 @@ def test_litellm_extra_fields_tolerated():
         )
 
     assert _provider(handler).complete_json("s", "u") == '{"ok": true}'
+
+
+def test_rejected_paid_response_keeps_usage_in_audit():
+    """Round-5/6 review: content:null with real usage is a PAID call — the
+    tokens and provider-reported model must reach the inference audit even
+    though the response is rejected."""
+    from resolute.judge.judge import Judge
+    from resolute.schemas import ShowFacts
+
+    def handler(req):
+        return httpx.Response(
+            200,
+            json={
+                "model": "claude-haiku-4-5-actual",
+                "choices": [{"message": {"content": None}}],
+                "usage": {"prompt_tokens": 321, "completion_tokens": 45},
+            },
+        )
+
+    provider = _provider(handler)
+    verdict, involvement = Judge(provider).judge_objective(
+        ShowFacts(canonical_title="X", genres=["Drama"])
+    )
+    assert verdict is None
+    # provider-level failures do not retry (only schema failures do), so this
+    # is exactly one paid attempt — and its spend is fully accounted
+    assert len(involvement.attempts) == 1
+    assert involvement.tokens_in == 321
+    assert involvement.tokens_out == 45
+    assert involvement.attempts[0].reported_model == "claude-haiku-4-5-actual"
+    assert "non-string content" in involvement.attempts[0].error

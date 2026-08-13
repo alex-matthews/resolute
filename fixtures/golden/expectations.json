@@ -33,6 +33,9 @@
         "expect_hold": false,
         "expect_actions": [
             "audit_sonarr_series_profile"
+        ],
+        "expect_approval_flags": [
+            false
         ]
     },
     {
@@ -69,6 +72,9 @@
         "expect_hold": false,
         "expect_actions": [
             "audit_sonarr_series_profile"
+        ],
+        "expect_approval_flags": [
+            false
         ]
     },
     {
@@ -109,6 +115,9 @@
         "expect_hold": true,
         "expect_actions": [
             "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false
         ]
     },
     {
@@ -189,6 +198,9 @@
         "expect_hold": false,
         "expect_actions": [
             "audit_sonarr_series_profile"
+        ],
+        "expect_approval_flags": [
+            false
         ]
     },
     {
@@ -225,6 +237,9 @@
         "expect_hold": true,
         "expect_actions": [
             "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false
         ]
     },
     {
@@ -237,6 +252,10 @@
         "expect_actions": [
             "insufficient_metadata",
             "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false,
+            false
         ]
     },
     {
@@ -250,6 +269,9 @@
         "expect_hold": true,
         "expect_actions": [
             "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false
         ]
     }
 ]

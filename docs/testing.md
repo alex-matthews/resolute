@@ -25,21 +25,28 @@ missing choices, HTTP errors, oversized output, LiteLLM response shape,
 usage capture). Proves the adapter converts every provider misbehavior into
 `ProviderError` so layer-1's fallback guarantees hold.
 
-## 3. Model evals (`resolute eval` / `mise run eval` — live model, opt-in)
+## 3. Local model evals (`resolute eval` / `mise run eval` — optional dev tool)
 
-The layer CI cannot be: labeled cases (`fixtures/eval/cases.json`) run against
-the **configured production model**, spending real money, scored against
+A workstation harness, not a deployment gate: it needs the repo checkout
+(corpus, git identity) and deliberately does not ship in the image. Its job
+is pre-flight sanity on prompt/model changes — schema conformance, gross
+taste regressions, injection resistance — before a Git commit enables the
+model in shadow; **shadow (layer 4) is the quality evidence** (ADR-0003:
+shadow is the calibration method, and real household requests are the real
+corpus). Labeled cases (`fixtures/eval/cases.json`) run against a live
+provider, spending real money, scored against
 
 - acceptable resolution *sets* (never exact prose),
 - hold expectations (with held-alternative acceptance),
 - repeat-run stability (`--repeat`, default 3),
 - schema-failure rate (any failure fails the case),
 - **cross-case invariants** — counterfactual pairs are scored relationally,
-  not independently: `different_resolutions` proves the varied input
-  (requester, free space, prose) actually changed the outcome (a judge that
-  answers 1080p to everything fails the invariant even when every individual
-  case passes), and `same_resolutions` proves an isolated input (episode
-  burden on the objective read) did NOT leak in,
+  not independently, over complete (resolution, held) outcomes with stable
+  operands: `different_outcomes` proves the varied input (requester, free
+  space, prose) actually changed the outcome (a judge that answers an unheld
+  1080p to everything fails the invariant even when every individual case
+  passes), and `same_outcomes` proves an isolated input (episode burden on
+  the objective read) did NOT leak in,
 - injection resistance: hostile overviews on both the request and objective
   paths.
 
@@ -81,7 +88,7 @@ and `model_tokens_total{direction}`.
 
 | Gate | Evidence required |
 | --- | --- |
-| Merging code | Layers 1–2 green in CI (the deploy template ships the model OFF) |
-| Enabling the model in shadow | Layer 3 report reviewed — rollout.md phase 0.5; the manifest flip is the gate |
+| Merging code | Layers 1–2 green in CI (the deploy template ships the model OFF and the CronJob suspended) |
+| Enabling the model in shadow | A reviewed Git commit (rollout.md phase 0.5) with a LiteLLM budget in place; layer 3 is optional pre-flight |
 | Leaving shadow (approve mode) | Layer 4: rollout.md phase-1 exit criteria |
 | Auto modes | Layer 4 sustained (rollout.md phases 3–4) |

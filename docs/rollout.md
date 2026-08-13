@@ -15,25 +15,28 @@ Writes are earned, not assumed. Each phase has an explicit exit criterion.
   profile names to IDs, confirms pending TV requests are visible, and lists
   Sonarr profiles. All checks must pass before moving on.
 
-## Phase 0.5 — the eval gate (model still OFF)
+## Phase 0.5 — enabling the model is a Git commit (GitOps-native gate)
 
-The manifests deliberately ship `RESOLUTE_JUDGE__ENABLED: "false"`: deployed
-resolute runs degraded (every decision a conservative 1080p hold) and spends
-nothing — including the nightly review CronJob. Before enabling the model
-anywhere:
+The manifests deliberately ship `RESOLUTE_JUDGE__ENABLED: "false"` **and the
+review CronJob suspended**: deployed resolute runs degraded (every decision a
+conservative 1080p hold), spends nothing, and writes no meaningless sweep
+records. There is no imperative pre-shadow procedure — per ADR-0003, shadow
+itself is the calibration method, and real household requests are the
+evaluation corpus. The gate is a single reviewed commit:
 
-- Review and expand `fixtures/eval/cases.json` (it was authored by the
-  implementing model; its acceptable-sets encode taste assumptions).
-- Run the eval in-cluster with a per-invocation override — the deployment
-  itself stays model-off:
-  `kubectl exec deploy/resolute -- env RESOLUTE_JUDGE__ENABLED=true resolute eval`
-  The report lands under `/data/eval-reports/` (the writable volume).
-- Review the report: case passes, invariant passes, schema-failure rate,
-  latency and token cost. Re-run after model, prompt-version, or prose
-  changes.
+- Before the commit: write the real household prose (1Password field), pin
+  the image by digest, and set a conservative budget/rate limit for
+  resolute's key in LiteLLM — that, not hope, is the spend bound.
+- Optionally, run the local eval harness from a workstation checkout
+  (`mise run eval` with `RESOLUTE_JUDGE__*` pointed at LiteLLM, e.g. via
+  port-forward) as a smoke check of schema conformance and prompt sanity.
+  It is a dev tool, not a gate — see docs/testing.md.
+- The commit itself: flip `RESOLUTE_JUDGE__ENABLED` to `"true"` and
+  unsuspend the review CronJob, with `allow_writes` still `false`. Flux
+  reconciles it; the change, its author, and its rollback are all Git.
 
-**Exit criterion:** a reviewed, passing eval report for the exact model and
-prompt version you are about to enable.
+**Exit criterion:** the commit is merged and reconciled; model-backed shadow
+decisions (with reasons) start accumulating on real requests.
 
 ## Phase 1 — shadow (no writes, weeks 1–2)
 

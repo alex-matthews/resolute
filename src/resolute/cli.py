@@ -453,7 +453,7 @@ def eval_models(
     cases: str = typer.Option("fixtures/eval/cases.json", "--cases"),
     repeat: int = typer.Option(3, help="Runs per case; stability is judged across them"),
     report: str | None = typer.Option(
-        None, "--report", help="Report path (default data/eval-reports/<timestamp>.json)"
+        None, "--report", help="Report path (default <db_path dir>/eval-reports/<timestamp>.json)"
     ),
     config: str | None = _config_option,
 ) -> None:
