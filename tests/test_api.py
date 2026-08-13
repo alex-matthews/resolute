@@ -665,3 +665,44 @@ def test_stored_v1_decision_round_trips(store):
     assert got.json()["model_involvement"]["prompt_version"] == "judge_v1"
     listed = client.get("/api/decisions").json()
     assert listed[0]["decision_id"] == decision.decision_id
+
+
+def test_model_metrics_count_attempts_not_inferences(
+    settings, policy, evidence_source, store
+):
+    """Round-4 review: a retried inference is two billable provider calls and
+    must be metered as such, labeled by model."""
+    from conftest import make_verdict
+
+    from resolute.engine.engine import DecisionEngine
+    from resolute.judge.judge import Judge
+    from resolute.judge.provider import StaticProvider
+
+    provider = StaticProvider(['{"not": "the schema"}', make_verdict("2160p", "high")])
+    engine = DecisionEngine(settings, policy, evidence_source, judge=Judge(provider))
+    client = TestClient(create_app(settings, policy, engine, store, None))
+    assert (
+        client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
+        .status_code
+        == 200
+    )
+    metrics_text = TestClient(create_metrics_app(client.app.state.metrics)).get("/metrics").text
+    assert 'resolute_model_inferences_total{model="static-test"} 1' in metrics_text
+    assert 'resolute_model_calls_total{model="static-test"} 2' in metrics_text
+    assert "resolute_model_fallback_total" not in metrics_text  # retry succeeded
+
+
+def test_model_metrics_record_fallback(settings, policy, evidence_source, store):
+    from conftest import CannedProvider
+
+    from resolute.engine.engine import DecisionEngine
+    from resolute.judge.judge import Judge
+
+    engine = DecisionEngine(
+        settings, policy, evidence_source, judge=Judge(CannedProvider("junk"))
+    )
+    client = TestClient(create_app(settings, policy, engine, store, None))
+    client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
+    metrics_text = TestClient(create_metrics_app(client.app.state.metrics)).get("/metrics").text
+    assert 'resolute_model_fallback_total{model="canned-test"} 1' in metrics_text
+    assert 'resolute_model_calls_total{model="canned-test"} 2' in metrics_text

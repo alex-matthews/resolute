@@ -34,17 +34,33 @@ the **configured production model**, spending real money, scored against
 - hold expectations (with held-alternative acceptance),
 - repeat-run stability (`--repeat`, default 3),
 - schema-failure rate (any failure fails the case),
-- counterfactual pairs: same show under ample vs tight space, requester A vs
-  B, changed household prose,
+- **cross-case invariants** — counterfactual pairs are scored relationally,
+  not independently: `different_resolutions` proves the varied input
+  (requester, free space, prose) actually changed the outcome (a judge that
+  answers 1080p to everything fails the invariant even when every individual
+  case passes), and `same_resolutions` proves an isolated input (episode
+  burden on the objective read) did NOT leak in,
 - injection resistance: hostile overviews on both the request and objective
-  paths,
-- objective/household separation: episode-burden invariance of the worth
-  judgment.
+  paths.
+
+Household prose loading is **required** (same as production serve): an eval
+against accidentally-empty prose would validate the wrong policy.
+
+Every run writes a durable JSON report (`data/eval-reports/`, or `--report`)
+identifying the commit, corpus hash, model/provider/prompt version, household
+hash, and per-run resolutions, holds, confidences, reasons, latency, and
+tokens. "Reviewing the Layer 3 report" means this artifact, not scrollback.
 
 Run it before leaving shadow mode, after changing the model or prompt version,
 and when editing household prose changes expected outcomes. The harness's own
-scoring logic is unit-tested in CI (`tests/test_evaluation.py`) with canned
-judges.
+scoring and invariant logic is unit-tested in CI (`tests/test_evaluation.py`)
+with canned judges — including a regression for the answers-1080p-to-everything
+judge.
+
+**Corpus honesty**: `fixtures/eval/cases.json` was authored by the model that
+wrote the implementation. Its acceptable-sets encode assumptions about the
+household's taste; review and expand it before treating a green eval as a
+gate (this is an operator to-do in the acceptance checklist).
 
 ## 4. Live shadow evidence (`docs/rollout.md` phase 1)
 
@@ -52,8 +68,10 @@ Provider drift, real metadata quality, and actual household agreement cannot
 be established offline. Shadow mode records every decision with full audit
 (per-attempt raw output, latency, tokens, evidence and prose hashes);
 `resolute calibrate` and `review-overrides` summarize agreement; the metrics
-listener exposes `model_calls_total`, `model_fallback_total`,
-`model_latency_ms_sum/count`, and `model_tokens_total{direction}`.
+listener exposes `model_inferences_total{model}`, `model_calls_total{model}`
+(billable granularity: one per provider attempt, so a retried inference
+meters as two), `model_fallback_total{model}`, `model_latency_ms_sum/count`,
+and `model_tokens_total{direction}`.
 
 ## What gates what
 

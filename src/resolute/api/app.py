@@ -128,9 +128,13 @@ def create_app(
     def _record_model_metrics(involvement, fell_back: bool) -> None:
         if not involvement.used:
             return
-        metrics["model_calls_total"] += 1
+        label = f'model="{involvement.model or "unknown"}"'
+        metrics[f"model_inferences_total{{{label}}}"] += 1
+        # Billable granularity: one provider call per attempt (a retry is a
+        # second spend), not one per inference.
+        metrics[f"model_calls_total{{{label}}}"] += max(1, len(involvement.attempts))
         if fell_back:
-            metrics["model_fallback_total"] += 1
+            metrics[f"model_fallback_total{{{label}}}"] += 1
         if involvement.latency_ms:
             metrics["model_latency_ms_sum"] += involvement.latency_ms
             metrics["model_latency_ms_count"] += 1

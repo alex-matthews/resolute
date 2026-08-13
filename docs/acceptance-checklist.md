@@ -107,5 +107,9 @@ From the cleansheet design + handoff. Verification commands assume
 - [ ] Create the `RESOLUTE_HOUSEHOLD_PROSE` field on the `resolute` 1Password
       item and write the real household prose (config/household.example.md is
       a skeleton) — the pod fails fast without the mount
-- [ ] Run `mise run eval` against the configured model and review the report
-      before leaving shadow mode
+- [ ] Review and expand `fixtures/eval/cases.json` (authored by the
+      implementing model — its acceptable-sets encode taste assumptions that
+      only the household can confirm)
+- [ ] Run `mise run eval` against the configured model; review the durable
+      report it writes (`data/eval-reports/`) before enabling the model in
+      shadow, and re-run on model/prompt/prose changes

@@ -452,14 +452,19 @@ def review_overrides(
 def eval_models(
     cases: str = typer.Option("fixtures/eval/cases.json", "--cases"),
     repeat: int = typer.Option(3, help="Runs per case; stability is judged across them"),
+    report: str | None = typer.Option(
+        None, "--report", help="Report path (default data/eval-reports/<timestamp>.json)"
+    ),
     config: str | None = _config_option,
 ) -> None:
     """Run the model-eval suite against the CONFIGURED LIVE model (spends money).
 
     CI proves the safety plumbing with canned verdicts; this proves the thing
-    inside the rails. Scores acceptable-set membership, hold expectations, and
-    repeat stability — never exact prose. See docs/testing.md."""
-    from .evaluation import evaluate_cases
+    inside the rails: acceptable-set membership, hold expectations, repeat
+    stability, and cross-case invariants (does requester/space/prose actually
+    change outcomes?). Writes a durable report identifying model, prompt,
+    household hash, corpus hash, and commit. See docs/testing.md."""
+    from .evaluation import build_report, check_invariants, evaluate_cases
     from .judge.judge import Judge
     from .judge.provider import OpenAICompatProvider
 
@@ -471,7 +476,9 @@ def eval_models(
             err=True,
         )
         raise typer.Exit(1)
-    household = load_household_policy(settings.household_policy_path)
+    # Same requirement as production serve: evaluating against accidentally
+    # empty household prose would validate the wrong policy.
+    household = load_household_policy(settings.household_policy_path, required=True)
     judge = Judge(
         OpenAICompatProvider(
             base_url=settings.judge.base_url,
@@ -480,8 +487,14 @@ def eval_models(
             timeout_seconds=settings.judge.timeout_seconds,
         )
     )
-    case_list = json.loads(Path(cases).read_text())
+    corpus_raw = Path(cases).read_text()
+    corpus = json.loads(corpus_raw)
+    case_list = corpus["cases"] if isinstance(corpus, dict) else corpus
+    invariants = corpus.get("invariants", []) if isinstance(corpus, dict) else []
+
     results = evaluate_cases(case_list, judge, settings, household, repeat=repeat)
+    invariant_results = check_invariants(results, invariants)
+
     failures = 0
     for r in results:
         status = "PASS" if r.passed else "FAIL"
@@ -490,12 +503,36 @@ def eval_models(
         for note in r.notes:
             typer.echo(f"       note: {note}")
         failures += 0 if r.passed else 1
-    total_tokens = sum(r.tokens_in + r.tokens_out for r in results)
-    total_ms = sum(r.latency_ms for r in results)
-    typer.echo(
-        f"{len(results) - failures}/{len(results)} cases passed"
-        f" | {settings.judge.model} | {total_ms} ms total | {total_tokens} tokens"
+    for inv in invariant_results:
+        status = "PASS" if inv.passed else "FAIL"
+        typer.echo(f"[{status}] invariant {inv.description}: {inv.detail}")
+        failures += 0 if inv.passed else 1
+
+    doc = build_report(
+        corpus_path=cases,
+        corpus_raw=corpus_raw,
+        settings=settings,
+        household=household,
+        repeat=repeat,
+        results=results,
+        invariant_results=invariant_results,
     )
+    out_path = Path(
+        report
+        or f"data/eval-reports/eval-{doc['generated_at'].replace(':', '').replace('+0000', 'Z')}.json"
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(doc, indent=2) + "\n")
+
+    summary = doc["summary"]
+    typer.echo(
+        f"{summary['cases_passed']}/{summary['cases_total']} cases,"
+        f" {summary['invariants_passed']}/{summary['invariants_total']} invariants"
+        f" | {settings.judge.model} @ {doc['model']['prompt_version']}"
+        f" | household {doc['household_hash']} | corpus {doc['corpus']['sha256']}"
+        f" | {summary['total_latency_ms']} ms | {summary['total_tokens']} tokens"
+    )
+    typer.echo(f"report: {out_path}")
     if failures:
         raise typer.Exit(1)
 
@@ -503,7 +540,9 @@ def eval_models(
 @app.command("fixtures-test")
 def fixtures_test(
     fixtures: str = typer.Option("fixtures/evidence", "--fixtures"),
-    golden: str = typer.Option("fixtures/golden/expectations.json", "--golden"),
+    golden: str = typer.Option(
+        "fixtures/golden/expectations.json", "--cases", "--golden"
+    ),
     config: str | None = _config_option,
 ) -> None:
     """Run golden expectations against fixture evidence. Exit 1 on any mismatch.
@@ -537,7 +576,7 @@ def fixtures_test(
             f"want {expected} hold={expect_hold}"
         )
         failures += 0 if ok else 1
-    typer.echo(f"{len(cases) - failures}/{len(cases)} golden cases passed")
+    typer.echo(f"{len(cases) - failures}/{len(cases)} pipeline cases passed")
     if failures:
         raise typer.Exit(1)
 

@@ -65,17 +65,43 @@ def test_http_error_is_provider_error():
         provider.complete_json("s", "u")
 
 
-def test_oversized_content_is_truncated():
+def test_oversized_content_is_provider_error():
     provider = _provider(lambda req: _ok("x" * 200_000))
-    assert len(provider.complete_json("s", "u")) == OpenAICompatProvider._MAX_RESPONSE_CHARS
+    with pytest.raises(ProviderError, match="exceeds"):
+        provider.complete_json("s", "u")
 
 
 def test_usage_is_captured_and_cleared():
-    provider = _provider(
-        lambda req: _ok('{"x": 1}', usage={"prompt_tokens": 321, "completion_tokens": 45})
-    )
+    calls = {"n": 0}
+
+    def handler(req):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _ok('{"x": 1}', usage={"prompt_tokens": 321, "completion_tokens": 45})
+        return httpx.Response(503, text="down")
+
+    provider = _provider(handler)
     provider.complete_json("s", "u")
     assert provider.last_usage == {"prompt_tokens": 321, "completion_tokens": 45}
+    with pytest.raises(ProviderError):
+        provider.complete_json("s", "u")
+    assert provider.last_usage is None  # cleared: stale usage never misattributed
+
+
+def test_default_client_sends_auth_header_and_timeout():
+    """Production client construction, not an injected one: auth header,
+    base_url, and timeout must come from the constructor args."""
+    provider = OpenAICompatProvider(
+        base_url="http://litellm.test/v1", api_key="sekrit-key", model="m",
+        timeout_seconds=7.5,
+    )
+    client = provider._client
+    assert client.headers["Authorization"] == "Bearer sekrit-key"
+    assert str(client.base_url).rstrip("/") == "http://litellm.test/v1"
+    assert client.timeout.read == 7.5
+
+    anon = OpenAICompatProvider(base_url="http://x", api_key="", model="m")
+    assert "Authorization" not in anon._client.headers
 
 
 def test_litellm_extra_fields_tolerated():

@@ -98,3 +98,85 @@ def test_household_prose_override_reaches_prompt(settings):
     case = _case(household_prose="ALWAYS_UNIQUE_MARKER prefers 4K")
     evaluate_cases([case], judge, settings, HouseholdPolicy(prose="default"), repeat=1)
     assert "ALWAYS_UNIQUE_MARKER" in judge.provider.calls[0][1]
+
+
+def test_invariant_catches_ineffective_requester_context(settings):
+    """Round-4 review: two independently-passing cases prove nothing. A judge
+    answering 1080p to everything must FAIL the pair invariant."""
+    from resolute.evaluation import check_invariants
+
+    judge = Judge(CannedProvider(make_verdict("1080p", "high")))
+    cases = [
+        _case(name="A", accept={"resolutions": ["1080p"], "hold": None}),
+        _case(name="B", accept={"resolutions": ["1080p", "2160p"], "hold": None}),
+    ]
+    results = evaluate_cases(cases, judge, settings, HouseholdPolicy(), repeat=2)
+    assert all(r.passed for r in results)  # individually fine...
+    invs = check_invariants(
+        results, [{"type": "different_resolutions", "a": "A", "b": "B"}]
+    )
+    assert not invs[0].passed  # ...but the pair proves no influence
+    assert "no observable effect" in invs[0].detail
+
+
+def test_invariant_same_resolutions_detects_leak(settings):
+    from resolute.evaluation import check_invariants
+
+    class ByTitle:
+        name = "bytitle"
+        model = "bytitle"
+
+        def complete_json(self, s, u):
+            return make_verdict("2160p" if "Big" not in u else "1080p", "high")
+
+    cases = [
+        {"name": "base", "kind": "objective",
+         "facts": {"canonical_title": "Doc", "genres": ["Documentary"]},
+         "accept": {"resolutions": ["1080p", "2160p"]}},
+        {"name": "burdened", "kind": "objective",
+         "facts": {"canonical_title": "Doc Big", "genres": ["Documentary"]},
+         "accept": {"resolutions": ["1080p", "2160p"]}},
+    ]
+    # objective verdicts need the objective schema
+    objective = lambda res: json.dumps(
+        {"objective": {"resolution": res, "confidence": "high", "reasons": ["r"]},
+         "risk_flags": []}
+    )
+
+    class ByTitleObjective:
+        name = "bt"
+        model = "bt"
+
+        def complete_json(self, s, u):
+            return objective("1080p" if "Big" in u else "2160p")
+
+    results = evaluate_cases(cases, Judge(ByTitleObjective()), settings, HouseholdPolicy(), repeat=1)
+    invs = check_invariants(
+        results, [{"type": "same_resolutions", "a": "base", "b": "burdened"}]
+    )
+    assert not invs[0].passed
+    assert "leaked" in invs[0].detail
+
+
+def test_report_carries_full_identity(settings, tmp_path):
+    from resolute.evaluation import build_report, check_invariants
+
+    judge = Judge(CannedProvider(make_verdict("2160p", "high")))
+    household = HouseholdPolicy(prose="some prose")
+    results = evaluate_cases([_case()], judge, settings, household, repeat=1)
+    report = build_report(
+        corpus_path="fixtures/eval/cases.json",
+        corpus_raw='{"cases": []}',
+        settings=settings,
+        household=household,
+        repeat=1,
+        results=results,
+        invariant_results=check_invariants(results, []),
+    )
+    assert report["model"]["prompt_version"] == "judge_v2"
+    assert report["household_hash"] == household.content_hash
+    assert len(report["corpus"]["sha256"]) == 16
+    assert report["commit"] is None or len(report["commit"]) == 40
+    assert report["cases"][0]["runs"][0]["resolution"] == "2160p"
+    assert report["cases"][0]["runs"][0]["confidence"] == "high"
+    assert report["summary"]["cases_passed"] == 1

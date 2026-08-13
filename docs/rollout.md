@@ -31,8 +31,9 @@ weights to tune, only prose to edit.
   happened.
 - Record feedback: `resolute feedback last agree` / `prefer_1080p` after real
   approvals. Read the model's reasons when you disagree.
-- Watch `model_fallback_total`, `model_latency_ms_sum/count`, and
-  `model_tokens_total{direction}` on the metrics listener, plus
+- Watch `model_fallback_total{model}`, `model_calls_total{model}` (billable
+  attempts), `model_latency_ms_sum/count`, and `model_tokens_total{direction}`
+  on the metrics listener, plus
   `model_unavailable` in risk flags: cost and degradation are on the normal
   path now.
 - Before phase 1, run `mise run eval` against the configured model and

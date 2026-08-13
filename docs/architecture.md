@@ -93,9 +93,10 @@ but the guarantee lives in the rails, not the wording.
 Reproducibility is handled by audit, not determinism: every model-backed
 decision stores provider, model, prompt version, evidence hash, household
 prose hash, and per-attempt raw output, error, latency, and token counts.
-The metrics listener exposes `model_calls_total`, `model_fallback_total`,
-`model_latency_ms_sum/count`, and `model_tokens_total{direction}` so cost
-and degradation stay observable (see docs/testing.md for the validation
+The metrics listener exposes `model_inferences_total{model}`,
+`model_calls_total{model}` (one per billable provider attempt),
+`model_fallback_total{model}`, `model_latency_ms_sum/count`, and
+`model_tokens_total{direction}` so cost and degradation stay observable (see docs/testing.md for the validation
 layering).
 
 ## The Costanza seam (ADR-0002, amended by ADR-0003)

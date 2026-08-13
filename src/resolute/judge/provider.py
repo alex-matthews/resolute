@@ -42,7 +42,9 @@ class OpenAICompatProvider:
 
     # A syntactically valid HTTP response can still carry a malformed body
     # (content: null, non-string content, absurd size). All of those must
-    # surface as ProviderError so the caller's fallback path runs.
+    # surface as ProviderError so the caller's fallback path runs — including
+    # oversized output: truncating could split a JSON object and would let an
+    # abusive response ride instead of failing closed.
     _MAX_RESPONSE_CHARS = 50_000
 
     def complete_json(self, system: str, user: str) -> str:
@@ -78,7 +80,12 @@ class OpenAICompatProvider:
             raise ProviderError(
                 f"model returned non-string content ({type(content).__name__})"
             )
-        return content[: self._MAX_RESPONSE_CHARS]
+        if len(content) > self._MAX_RESPONSE_CHARS:
+            raise ProviderError(
+                f"model response exceeds {self._MAX_RESPONSE_CHARS} chars"
+                f" ({len(content)})"
+            )
+        return content
 
 
 class StaticProvider:
