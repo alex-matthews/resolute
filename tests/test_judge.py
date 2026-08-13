@@ -51,7 +51,7 @@ def test_markdown_fenced_json_is_tolerated(policy):
 def test_invalid_then_valid_retries_once(policy):
     provider = StaticProvider(['{"not": "the schema"}', VALID])
     evidence, pre = _judge_inputs(policy)
-    verdict, involvement = Judge(provider).judge(evidence, pre, policy)
+    verdict, _involvement = Judge(provider).judge(evidence, pre, policy)
     assert verdict is not None
     assert len(provider.calls) == 2
     assert "invalid" in provider.calls[1][1]  # retry prompt carries the error

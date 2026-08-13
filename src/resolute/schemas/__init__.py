@@ -1,11 +1,11 @@
 from .core import (
+    WRITE_ACTIONS,
     ActionType,
     AutomationMode,
     Confidence,
     FeedbackVerdict,
     Resolution,
     TriggerSource,
-    WRITE_ACTIONS,
 )
 from .decision import Action, Decision, ModelInvolvement, Recommendation, ScoreComponent
 from .evidence import EvidenceBundle, SeerrRequestState, ShowFacts, SonarrState
@@ -14,6 +14,8 @@ from .request import DecisionRequest
 from .verdict import MODEL_VERDICT_JSON_SCHEMA, ModelVerdict, VerdictAutomation, VerdictLane
 
 __all__ = [
+    "MODEL_VERDICT_JSON_SCHEMA",
+    "WRITE_ACTIONS",
     "Action",
     "ActionType",
     "AutomationMode",
@@ -24,7 +26,6 @@ __all__ = [
     "FeedbackIn",
     "FeedbackRecord",
     "FeedbackVerdict",
-    "MODEL_VERDICT_JSON_SCHEMA",
     "ModelInvolvement",
     "ModelVerdict",
     "Recommendation",
@@ -36,5 +37,4 @@ __all__ = [
     "TriggerSource",
     "VerdictAutomation",
     "VerdictLane",
-    "WRITE_ACTIONS",
 ]

@@ -9,10 +9,9 @@ import json
 
 import httpx
 import pytest
+from conftest import load_fixture
 
 from resolute.seerr.client import RequestNotPendingError, SeerrClient, SeerrError
-
-from conftest import load_fixture
 
 
 def _client(handler) -> SeerrClient:

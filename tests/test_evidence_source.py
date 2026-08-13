@@ -1,5 +1,7 @@
 """Provider abstraction tests: Seerr/Sonarr responses -> EvidenceBundle, no network."""
 
+from conftest import load_fixture
+
 from resolute.metadata.source import (
     LiveEvidenceSource,
     facts_from_seerr_tv,
@@ -7,8 +9,6 @@ from resolute.metadata.source import (
 )
 from resolute.schemas import DecisionRequest
 from resolute.seerr.client import SeerrError
-
-from conftest import load_fixture
 
 
 class FakeSeerrClient:
