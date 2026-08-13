@@ -65,6 +65,11 @@ class SonarrClient:
         """In-flight grabs/imports for a series (downgrade precondition check)."""
         return self._get("/queue/details", seriesId=series_id)
 
+    def get_diskspace(self) -> list[dict]:
+        """Mounted volumes with free/total bytes (ADR-0003: live storage
+        evidence replaces the hand-set storage_pressure knob)."""
+        return self._get("/diskspace")
+
     # -- writes ------------------------------------------------------------
     # Discipline (ADR-0001 + ADR-0002): resolute never deletes files. The
     # profile write is only safe when no search is in flight, and the *only*

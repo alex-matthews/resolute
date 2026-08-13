@@ -8,10 +8,16 @@ from .core import (
     TriggerSource,
 )
 from .decision import Action, Decision, ModelInvolvement, Recommendation, ScoreComponent
-from .evidence import EvidenceBundle, SeerrRequestState, ShowFacts, SonarrState
+from .evidence import DiskMount, EvidenceBundle, SeerrRequestState, ShowFacts, SonarrState
 from .feedback import FeedbackIn, FeedbackRecord
 from .request import DecisionRequest
-from .verdict import MODEL_VERDICT_JSON_SCHEMA, ModelVerdict, VerdictAutomation, VerdictLane
+from .verdict import (
+    MODEL_VERDICT_JSON_SCHEMA,
+    ModelVerdict,
+    ObjectiveVerdict,
+    VerdictAutomation,
+    VerdictLane,
+)
 
 __all__ = [
     "MODEL_VERDICT_JSON_SCHEMA",
@@ -22,12 +28,14 @@ __all__ = [
     "Confidence",
     "Decision",
     "DecisionRequest",
+    "DiskMount",
     "EvidenceBundle",
     "FeedbackIn",
     "FeedbackRecord",
     "FeedbackVerdict",
     "ModelInvolvement",
     "ModelVerdict",
+    "ObjectiveVerdict",
     "Recommendation",
     "Resolution",
     "ScoreComponent",

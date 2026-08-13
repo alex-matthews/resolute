@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Protocol
 
-from ..schemas import DecisionRequest, EvidenceBundle, SeerrRequestState, ShowFacts
+from ..schemas import DecisionRequest, DiskMount, EvidenceBundle, SeerrRequestState, ShowFacts
 from ..seerr.client import SeerrClient, SeerrError
 from ..sonarr.audit import sonarr_state_from_series
 from ..sonarr.client import SonarrClient, SonarrError
@@ -151,6 +151,22 @@ class LiveEvidenceSource:
             except SonarrError as exc:
                 logger.warning("sonarr lookup failed: %s", exc)
                 bundle.gaps.append("sonarr_state")
+
+        if self._sonarr is not None:
+            try:
+                bundle.diskspace = [
+                    DiskMount(
+                        path=d.get("path"),
+                        label=d.get("label"),
+                        free_bytes=d.get("freeSpace"),
+                        total_bytes=d.get("totalSpace"),
+                    )
+                    for d in self._sonarr.get_diskspace()
+                ]
+                bundle.sources.append("sonarr:/diskspace")
+            except SonarrError as exc:
+                logger.warning("sonarr diskspace failed: %s", exc)
+                bundle.gaps.append("diskspace")
 
         return bundle
 

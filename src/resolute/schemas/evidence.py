@@ -62,6 +62,18 @@ class SeerrRequestState(BaseModel):
     requested_seasons: list[int] = Field(default_factory=list)
 
 
+class DiskMount(BaseModel):
+    """One Sonarr-visible volume (ADR-0003: measured free space is evidence;
+    no hand-maintained storage_pressure proxy)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str | None = None
+    label: str | None = None
+    free_bytes: int | None = None
+    total_bytes: int | None = None
+
+
 class EvidenceBundle(BaseModel):
     """Everything the engine and judge are allowed to look at."""
 
@@ -70,6 +82,7 @@ class EvidenceBundle(BaseModel):
     facts: ShowFacts = Field(default_factory=ShowFacts)
     sonarr: SonarrState = Field(default_factory=SonarrState)
     seerr_request: SeerrRequestState = Field(default_factory=SeerrRequestState)
+    diskspace: list[DiskMount] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)  # named missing-evidence markers
     sources: list[str] = Field(default_factory=list)  # provenance, e.g. "seerr:/tv/95396"
 
