@@ -41,6 +41,21 @@ class Action(BaseModel):
         return self.type in WRITE_ACTIONS
 
 
+class ModelAttempt(BaseModel):
+    """One provider call within an inference: ADR-0003's audit rationale
+    requires every attempt's raw output, not just the last one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    raw_output: str | None = None
+    error: str | None = None
+    latency_ms: int | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
+    # What the provider said it ran (may differ from the configured name).
+    reported_model: str | None = None
+
+
 class ModelInvolvement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -49,9 +64,16 @@ class ModelInvolvement(BaseModel):
     model: str | None = None
     prompt_version: str | None = None
     evidence_hash: str | None = None
+    # Fingerprint of the household prose the decision was made under (ADR-0003);
+    # the prose itself is sensitive and never stored.
+    household_hash: str | None = None
+    # Final-attempt raw output (v1-compatible field); attempts carries all.
     raw_output: str | None = None
     error: str | None = None
     latency_ms: int | None = None
+    tokens_in: int | None = None
+    tokens_out: int | None = None
+    attempts: list[ModelAttempt] = Field(default_factory=list)
 
 
 class Decision(BaseModel):
@@ -75,6 +97,8 @@ class Decision(BaseModel):
     final_resolution: Resolution
     confidence: Confidence
 
+    # v1 relics: the deterministic pre-score is gone (ADR-0003), but stored v1
+    # decisions carry these, so they stay as optional fields for readability.
     score: float = 0.0
     score_components: list[ScoreComponent] = Field(default_factory=list)
     top_reasons: list[str] = Field(default_factory=list)

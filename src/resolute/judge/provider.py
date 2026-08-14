@@ -40,7 +40,16 @@ class OpenAICompatProvider:
             headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
         )
 
+    # A syntactically valid HTTP response can still carry a malformed body
+    # (content: null, non-string content, absurd size). All of those must
+    # surface as ProviderError so the caller's fallback path runs — including
+    # oversized output: truncating could split a JSON object and would let an
+    # abusive response ride instead of failing closed.
+    _MAX_RESPONSE_CHARS = 50_000
+
     def complete_json(self, system: str, user: str) -> str:
+        self.last_usage = None
+        self.last_reported_model = None
         try:
             response = self._client.post(
                 "/chat/completions",
@@ -55,9 +64,30 @@ class OpenAICompatProvider:
                 },
             )
             response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
+        except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as exc:
             raise ProviderError(f"model call failed: {exc}") from exc
+        self.last_reported_model = data.get("model")
+        usage = data.get("usage") or {}
+        self.last_usage = (
+            {
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
+            }
+            if usage
+            else None
+        )
+        if not isinstance(content, str):
+            raise ProviderError(
+                f"model returned non-string content ({type(content).__name__})"
+            )
+        if len(content) > self._MAX_RESPONSE_CHARS:
+            raise ProviderError(
+                f"model response exceeds {self._MAX_RESPONSE_CHARS} chars"
+                f" ({len(content)})"
+            )
+        return content
 
 
 class StaticProvider:

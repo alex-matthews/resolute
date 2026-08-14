@@ -13,7 +13,9 @@ def env(tmp_path, fixtures_dir):
     """Environment that keeps CLI runs offline and inside tmp_path."""
     return {
         "RESOLUTE_DB_PATH": str(tmp_path / "cli.db"),
-        "RESOLUTE_POLICY_PATH": str(fixtures_dir.parent / "config" / "policy.yaml"),
+        "RESOLUTE_HOUSEHOLD_POLICY_PATH": str(
+            fixtures_dir.parent / "config" / "household.example.md"
+        ),
     }
 
 
@@ -35,19 +37,21 @@ def _decide(env, fixtures_dir, *extra):
     )
 
 
-def test_decide_offline(env, fixtures_dir):
+def test_decide_offline_degrades_without_model(env, fixtures_dir):
+    """ADR-0003: no model configured -> conservative fallback, not a decision."""
     result = _decide(env, fixtures_dir)
     assert result.exit_code == 0, result.output
-    assert "2160p" in result.output
-    assert "mode=shadow" in result.output
+    assert "1080p" in result.output
+    assert "mode     : shadow" in result.output
 
 
 def test_decide_json_output(env, fixtures_dir):
     result = _decide(env, fixtures_dir, "--json")
     assert result.exit_code == 0, result.output
     body = json.loads(result.output)
-    assert body["final_resolution"] == "2160p"
-    assert body["confidence"] == "high"
+    assert body["final_resolution"] == "1080p"  # conservative fallback (no model)
+    assert body["confidence"] == "low"
+    assert "model_unavailable" in body["risk_flags"]
 
 
 def test_feedback_last_and_calibrate_and_overrides(env, fixtures_dir):
@@ -82,7 +86,8 @@ def test_feedback_last_and_calibrate_and_overrides(env, fixtures_dir):
     assert "prefer_1080p" in ov.output
 
 
-def test_feedback_rejects_unknown_reason_tag(env, fixtures_dir):
+def test_feedback_accepts_free_text_reason_tag(env, fixtures_dir):
+    """v2: the reason-tag taxonomy died with the calibration ritual."""
     assert _decide(env, fixtures_dir).exit_code == 0
     fb = runner.invoke(
         app,
@@ -91,13 +96,13 @@ def test_feedback_rejects_unknown_reason_tag(env, fixtures_dir):
             "last",
             "prefer_1080p",
             "--reason-tag",
-            "not_a_tag",
+            "any_free_text",
             "--fixtures",
             str(fixtures_dir / "evidence"),
         ],
         env=env,
     )
-    assert fb.exit_code == 1
+    assert fb.exit_code == 0, fb.output
 
 
 def test_fixtures_test_golden_suite(env, fixtures_dir):
@@ -116,14 +121,14 @@ def test_fixtures_test_golden_suite(env, fixtures_dir):
     assert "FAIL" not in result.output
 
 
-def test_execute_command_exists_and_is_mode_gated(env, fixtures_dir):
+def test_execute_command_blocks_held_fallback_decision(env, fixtures_dir):
     assert _decide(env, fixtures_dir).exit_code == 0
-    # shadow decision with no write actions: executes nothing, exits cleanly
+    # the model-less decision is a conservative hold: execution refuses it
     result = runner.invoke(
         app, ["execute", "last", "--operator", "alex", "--yes"], env=env
     )
-    assert result.exit_code == 0, result.output
-    assert "nothing executed" in result.output
+    assert result.exit_code == 1
+    assert "blocked" in result.output
 
 
 def test_execute_command_unknown_decision(env):
@@ -214,3 +219,32 @@ def test_review_pending_remote_transport_error_is_sanitized(env, monkeypatch):
     assert result.exit_code == 1
     assert "ConnectError" in result.output
     assert "apikey" not in result.output
+
+
+def test_eval_report_defaults_to_data_volume(tmp_path, monkeypatch):
+    """Round-5 review: in-cluster the rootfs is read-only and only the data
+    volume is writable — a CWD-relative report default would spend the model
+    budget and then crash on save. The default must derive from db_path."""
+    import json as _json
+
+    from resolute.cli import app as cli_app
+
+    household = tmp_path / "household.md"
+    household.write_text("prose\n")
+    cases = tmp_path / "cases.json"
+    cases.write_text(_json.dumps({"cases": [], "invariants": []}))
+    data_dir = tmp_path / "data-volume"
+    data_dir.mkdir()
+    env = {
+        "RESOLUTE_DB_PATH": str(data_dir / "resolute.db"),
+        "RESOLUTE_HOUSEHOLD_POLICY_PATH": str(household),
+        "RESOLUTE_JUDGE__ENABLED": "true",
+    }
+    monkeypatch.chdir(tmp_path)  # CWD is NOT writable-adjacent in-cluster
+    result = runner.invoke(cli_app, ["eval", "--cases", str(cases)], env=env)
+    assert result.exit_code == 0, result.output
+    reports = list((data_dir / "eval-reports").glob("eval-*.json"))
+    assert len(reports) == 1  # landed on the data volume, not CWD
+    report = _json.loads(reports[0].read_text())
+    assert report["summary"]["cases_total"] == 0
+    assert report["household_hash"]

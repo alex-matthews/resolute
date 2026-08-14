@@ -22,7 +22,7 @@ class AutomationMode(StrEnum):
     shadow       - no writes; compare recommendation to current state and log the delta.
     recommend    - no writes; return/publish the recommendation and action plan.
     approve      - writes happen only via an explicit operator execute command.
-    auto_profile - update the pending Seerr request profile when guardrails pass.
+    auto_profile - update the pending Seerr request profile when the rails pass.
     auto_approve - additionally approve the Seerr request; disabled by default in config.
     """
 

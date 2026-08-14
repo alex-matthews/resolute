@@ -7,11 +7,31 @@ from .core import (
     Resolution,
     TriggerSource,
 )
-from .decision import Action, Decision, ModelInvolvement, Recommendation, ScoreComponent
-from .evidence import EvidenceBundle, SeerrRequestState, ShowFacts, SonarrState
+from .decision import (
+    Action,
+    Decision,
+    ModelAttempt,
+    ModelInvolvement,
+    Recommendation,
+    ScoreComponent,
+)
+from .evidence import (
+    DiskMount,
+    EvidenceBundle,
+    ObjectiveFacts,
+    SeerrRequestState,
+    ShowFacts,
+    SonarrState,
+)
 from .feedback import FeedbackIn, FeedbackRecord
 from .request import DecisionRequest
-from .verdict import MODEL_VERDICT_JSON_SCHEMA, ModelVerdict, VerdictAutomation, VerdictLane
+from .verdict import (
+    MODEL_VERDICT_JSON_SCHEMA,
+    ModelVerdict,
+    ObjectiveVerdict,
+    VerdictAutomation,
+    VerdictLane,
+)
 
 __all__ = [
     "MODEL_VERDICT_JSON_SCHEMA",
@@ -22,12 +42,16 @@ __all__ = [
     "Confidence",
     "Decision",
     "DecisionRequest",
+    "DiskMount",
     "EvidenceBundle",
     "FeedbackIn",
     "FeedbackRecord",
     "FeedbackVerdict",
+    "ModelAttempt",
     "ModelInvolvement",
     "ModelVerdict",
+    "ObjectiveFacts",
+    "ObjectiveVerdict",
     "Recommendation",
     "Resolution",
     "ScoreComponent",

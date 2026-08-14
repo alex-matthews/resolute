@@ -28,14 +28,21 @@ class FakeSeerrClient:
 
 
 class FakeSonarrClient:
-    def __init__(self, series=None):
+    def __init__(self, series=None, diskspace=None):
         self._series = series
+        self._diskspace = diskspace or [
+            {"path": "/media", "label": "media", "freeSpace": 2_000_000_000_000,
+             "totalSpace": 8_000_000_000_000}
+        ]
 
     def get_series_by_tvdb(self, tvdb_id):
         return self._series
 
     def list_quality_profiles(self):
         return load_fixture("sonarr", "quality_profiles.json")
+
+    def get_diskspace(self):
+        return self._diskspace
 
 
 def test_facts_mapping_from_seerr_tv_fixture():
@@ -70,6 +77,8 @@ def test_live_source_combines_seerr_and_sonarr():
     assert bundle.seerr_request.request_id == 123
     assert bundle.sonarr.exists
     assert bundle.sonarr.quality_profile_name == "HD-1080p"
+    assert bundle.diskspace and bundle.diskspace[0].free_bytes == 2_000_000_000_000
+    assert "sonarr:/diskspace" in bundle.sources
     assert not bundle.gaps
 
 

@@ -21,23 +21,33 @@ LABEL org.opencontainers.image.source="https://github.com/alex-matthews/resolute
 
 COPY --from=build /app/.venv /app/.venv
 
+# The runtime installs nothing: pip/setuptools/wheel (and pip's vendored
+# libraries) are the image's main CVE surface and serve no purpose here —
+# uv built the venv at build time. ensurepip goes too so nothing can
+# resurrect pip in a running container.
 # Identity-agnostic image (home-operations/containers precedent, e.g.
-# apps/tautulli): no user is created, nothing is chown'd, and no policy
+# apps/tautulli): no user is created, nothing is chown'd, and no household
 # file is baked in. Kubernetes owns storage identity (runAsUser/runAsGroup/
 # fsGroup — 1032:100 in this cluster) and supplies /data (PVC) and
-# /config/policy.yaml (ConfigMap); `nobody:nogroup` is only the default
+# /config/household.md (Secret; it names household members — ADR-0003);
+# `nobody:nogroup` is only the default
 # for bare `docker run`s. Bytecode is precompiled at build time, so the
 # image runs with a read-only rootfs under any arbitrary uid:gid.
 # /config and /data exist empty (no chown) so ConfigMap subPath/file
 # mounts and PVC mount points have stable targets under kubelet with a
 # read-only rootfs, not just under Docker bind mounts.
-RUN mkdir -p /config /data
+RUN rm -rf /usr/local/lib/python3.14/site-packages/pip* \
+           /usr/local/lib/python3.14/site-packages/setuptools* \
+           /usr/local/lib/python3.14/site-packages/wheel* \
+           /usr/local/lib/python3.14/ensurepip \
+           /usr/local/bin/pip* \
+    && mkdir -p /config /data
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     RESOLUTE_DB_PATH=/data/resolute.db \
-    RESOLUTE_POLICY_PATH=/config/policy.yaml
+    RESOLUTE_HOUSEHOLD_POLICY_PATH=/config/household.md
 
 # Numeric uid:gid (= nobody:nogroup) so hosts and Kubernetes runAsNonRoot
 # checks can resolve it without the image's /etc/passwd (DL3066).

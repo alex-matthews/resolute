@@ -27,16 +27,22 @@ spec:
             env:
               TZ: Pacific/Auckland
               RESOLUTE_MODE: shadow          # rollout: shadow -> recommend -> approve
-              RESOLUTE_ALLOW_WRITES: "false" # master write switch; keep false until docs/rollout.md phase 3
+              RESOLUTE_ALLOW_WRITES: "false" # master write switch; keep false until docs/rollout.md phase 2 (approve)
               RESOLUTE_AUTO_APPROVE_ENABLED: "false"
               RESOLUTE_DB_PATH: /data/resolute.db
-              RESOLUTE_POLICY_PATH: /config/policy.yaml
+              RESOLUTE_HOUSEHOLD_POLICY_PATH: /config/household.md
               # Ports follow the config defaults (org convention): app 8080,
               # /metrics on its own 8081 listener. No override needed.
               RESOLUTE_SEERR__URL: http://seerr.default.svc.cluster.local
               RESOLUTE_SONARR__URL: http://sonarr.default.svc.cluster.local
               RESOLUTE_SEERR__PROFILE_NAME_1080P: HD-1080p   # match your Sonarr profile names exactly
               RESOLUTE_SEERR__PROFILE_NAME_2160P: Ultra-HD
+              # ADR-0003: the model IS the engine, but it ships OFF —
+              # disabled = degraded fallback (every decision holds at 1080p),
+              # and nothing spends. Enabling it is a reviewed Git commit
+              # (flip this to "true" and unsuspend the review CronJob), made
+              # after the docs/rollout.md pre-shadow checklist — the gate is
+              # the commit, visible to Flux, not an imperative pod exec.
               RESOLUTE_JUDGE__ENABLED: "false"
               RESOLUTE_JUDGE__BASE_URL: http://litellm.default.svc.cluster.local/v1
             envFrom:
@@ -71,9 +77,13 @@ spec:
       # Scheduled library review: nightly sweep of pending Seerr TV requests,
       # via the API so the SQLite writer and its RWO PVC stay with the API pod.
       # The endpoint only decides and records; it never executes writes.
+      # Ships SUSPENDED: with the model off every sweep would pollute decision
+      # history with meaningless degraded 1080p holds. Unsuspend in the same
+      # commit that enables the model for shadow (docs/rollout.md).
       review:
         type: cronjob
         cronjob:
+          suspend: true
           schedule: "0 4 * * *"
           successfulJobsHistory: 1
           failedJobsHistory: 1
@@ -131,14 +141,14 @@ spec:
           resolute:
             app:
               - path: /data
-      policy:
-        type: configMap
-        name: resolute-policy
+      household:
+        type: secret
+        name: resolute-household-secret
         advancedMounts:
           resolute:
             app:
-              - path: /config/policy.yaml
-                subPath: policy.yaml
+              - path: /config/household.md
+                subPath: household.md
                 readOnly: true
       tmpfs:
         type: emptyDir

@@ -12,8 +12,10 @@ OPERATOR_TOKEN = "test-operator-token"
 
 @pytest.fixture
 def api(settings, policy, evidence_source, store):
+    from conftest import canned_judge
+
     settings.execute_token = OPERATOR_TOKEN
-    engine = DecisionEngine(settings, policy, evidence_source)
+    engine = DecisionEngine(settings, policy, evidence_source, judge=canned_judge())
     executor = Executor(settings, seerr=FakeSeerr(), sonarr=FakeSonarr())
     app = create_app(settings, policy, engine, store, executor)
     return TestClient(app), settings, executor
@@ -104,15 +106,17 @@ def _auto_settings(tmp_path, mode, **kwargs):
         mode=mode,
         allow_writes=True,
         db_path=tmp_path / "auto.db",
-        policy_path=tmp_path / "missing.yaml",
+        household_policy_path=tmp_path / "missing.md",
         seerr={"webhook_shared_secret": "hook-secret"},
         **kwargs,
     )
 
 
 def test_webhook_auto_profile_executes(policy, evidence_source, store, webhook_payload, tmp_path):
+    from conftest import canned_judge
+
     settings = _auto_settings(tmp_path, AutomationMode.AUTO_PROFILE)
-    engine = DecisionEngine(settings, policy, evidence_source)
+    engine = DecisionEngine(settings, policy, evidence_source, judge=canned_judge())
     executor = Executor(settings, seerr=FakeSeerr(), sonarr=FakeSonarr())
     client = TestClient(create_app(settings, policy, engine, store, executor))
 
@@ -157,17 +161,18 @@ def test_feedback_flow(api):
         ).status_code
         == 404
     )
+    # reason_tag is free text in v2 (the taxonomy died with the calibration ritual)
     assert (
         client.post(
             "/api/feedback",
-            json={"decision_id": decision_id, "verdict": "agree", "reason_tag": "nope"},
+            json={"decision_id": decision_id, "verdict": "agree", "reason_tag": "anything"},
         ).status_code
-        == 422
+        == 200
     )
 
     summary = client.get("/api/calibration/summary").json()
-    assert summary["feedback"] == 1
-    assert summary["override_reason_tags"] == {"storage": 1}
+    assert summary["feedback"] == 2
+    assert summary["override_reason_tags"] == {"storage": 1}  # free-text tags still counted
 
 
 def test_execute_endpoint_requires_operator_token(api):
@@ -239,7 +244,9 @@ def test_reviews_pending_endpoint(settings, policy, evidence_source, store):
                 {"id": 124, "status": 1, "media": {"mediaType": "movie", "tmdbId": 1}},
             ]
 
-    engine = DecisionEngine(settings, policy, evidence_source)
+    from conftest import canned_judge
+
+    engine = DecisionEngine(settings, policy, evidence_source, judge=canned_judge())
     client = TestClient(
         create_app(settings, policy, engine, store, None, seerr=FakeSeerrList())
     )
@@ -296,12 +303,13 @@ def test_webhook_exempt_from_api_token(
 def test_partial_execution_is_recorded_durably(
     settings, policy, evidence_source, store, webhook_payload
 ):
+    from conftest import canned_judge
     from test_executor import FailingApproveSeerr
 
     settings.execute_token = OPERATOR_TOKEN
     settings.mode = AutomationMode.APPROVE
     settings.allow_writes = True
-    engine = DecisionEngine(settings, policy, evidence_source)
+    engine = DecisionEngine(settings, policy, evidence_source, judge=canned_judge())
     executor = Executor(settings, seerr=FailingApproveSeerr(), sonarr=FakeSonarr())
     client = TestClient(create_app(settings, policy, engine, store, executor))
 
@@ -325,12 +333,13 @@ def test_partial_execution_is_recorded_durably(
 def test_webhook_auto_execution_records_partial_and_reports_error(
     policy, evidence_source, store, webhook_payload, tmp_path
 ):
+    from conftest import canned_judge
     from test_executor import FailingApproveSeerr
 
     settings = _auto_settings(
         tmp_path, AutomationMode.AUTO_APPROVE, auto_approve_enabled=True
     )
-    engine = DecisionEngine(settings, policy, evidence_source)
+    engine = DecisionEngine(settings, policy, evidence_source, judge=canned_judge())
     executor = Executor(settings, seerr=FailingApproveSeerr(), sonarr=FakeSonarr())
     client = TestClient(create_app(settings, policy, engine, store, executor))
 
@@ -417,15 +426,36 @@ class WorthSonarr:
         return None
 
 
-def _worth_client(settings, policy, evidence_source, store):
+OBJECTIVE_2160 = (
+    '{"objective": {"resolution": "2160p", "confidence": "high",'
+    ' "reasons": ["visual showcase"]}, "risk_flags": []}'
+)
+
+
+def _worth_client(settings, policy, evidence_source, store, judge="valid"):
+    from conftest import CannedProvider
+
     from resolute.api.app import create_app
     from resolute.engine.engine import DecisionEngine
+    from resolute.judge.judge import Judge
 
-    engine = DecisionEngine(settings, policy, evidence_source)
+    if judge == "valid":
+        j = Judge(CannedProvider(OBJECTIVE_2160))
+    elif judge == "broken":
+        j = Judge(CannedProvider("not json"))
+    else:
+        j = None
+    engine = DecisionEngine(settings, policy, evidence_source, judge=j)
     app = create_app(
         settings, policy, engine, store, None, seerr=WorthSeerr(), sonarr=WorthSonarr()
     )
     return TestClient(app)
+
+
+def _audit_rows(store):
+    return store._conn.execute(
+        "SELECT payload FROM audits WHERE tvdb_id = 371980"
+    ).fetchall()
 
 
 def test_objective_worth_via_sonarr_title_and_search(
@@ -436,10 +466,11 @@ def test_objective_worth_via_sonarr_title_and_search(
     assert body["worth"] == "2160p"
     assert body["tmdb_id"] == 95396
     assert body["title"] == "Severance"
-    assert body["objective_score"] > 0
     assert body["reasons"]
-    # pure read: no decision recorded
+    assert "objective_score" not in body  # removed at the v2 cutover (ADR-0003)
+    # read-only wrt domain state: no decision, but a mandatory inference audit
     assert store.list_decisions() == []
+    assert len(_audit_rows(store)) == 1
 
 
 def test_objective_worth_verifies_tmdb_hint(settings, policy, evidence_source, store):
@@ -458,6 +489,28 @@ def test_objective_worth_unavailable_degrades(settings, policy, evidence_source,
     body = client.get("/api/titles/12345/objective-worth").json()
     assert body["worth"] == "unavailable"
     assert "reason" in body
+
+
+def test_objective_worth_model_failure_degrades_to_unavailable(
+    settings, policy, evidence_source, store
+):
+    """ADR-0003: model failure on the evidence read maps to worth=unavailable
+    (never the request-path 1080p-hold), and the failed inference is audited."""
+    client = _worth_client(settings, policy, evidence_source, store, judge="broken")
+    body = client.get("/api/titles/371980/objective-worth").json()
+    assert body["worth"] == "unavailable"
+    assert "model" in body["reason"]
+    assert store.list_decisions() == []
+    assert len(_audit_rows(store)) == 1
+
+
+def test_objective_worth_model_disabled_degrades_to_unavailable(
+    settings, policy, evidence_source, store
+):
+    client = _worth_client(settings, policy, evidence_source, store, judge=None)
+    body = client.get("/api/titles/371980/objective-worth").json()
+    assert body["worth"] == "unavailable"
+    assert "disabled" in body["reason"]
 
 
 def test_downgrade_plan_endpoint_is_read_only(settings, policy, evidence_source, store):
@@ -532,3 +585,124 @@ def test_downgrade_execute_endpoint_gates(settings, policy, evidence_source, sto
     # live reconciliation: profile on target, 2160p resident, nothing queued
     assert record["reconciliation"]["outcome"] == "pending"
     assert client.get("/api/downgrades/nope").status_code == 404
+
+
+def test_objective_worth_audits_even_on_provider_explosion(
+    settings, policy, evidence_source, store
+):
+    """Adversarial review #3: an unexpected provider exception must degrade to
+    unavailable (never HTTP 500) and still leave an inference-audit row."""
+    from resolute.api.app import create_app
+    from resolute.engine.engine import DecisionEngine
+    from resolute.judge.judge import Judge
+
+    class ExplodingProvider:
+        name = "boom"
+        model = "boom-test"
+
+        def complete_json(self, system, user):
+            raise RuntimeError("socket weirdness")
+
+    engine = DecisionEngine(
+        settings, policy, evidence_source, judge=Judge(ExplodingProvider())
+    )
+    client = TestClient(
+        create_app(settings, policy, engine, store, None, seerr=WorthSeerr(), sonarr=WorthSonarr())
+    )
+    response = client.get("/api/titles/371980/objective-worth")
+    assert response.status_code == 200
+    assert response.json()["worth"] == "unavailable"
+    assert len(_audit_rows(store)) == 1
+
+
+def test_stored_v1_decision_round_trips(store):
+    """Adversarial review #8: a realistic judge_v1-era record must parse, save,
+    and serve through the store and API paths under the v2 schema."""
+    from resolute.schemas import Decision
+
+    v1_json = {
+        "decision_id": "01V1RECORD000000000000000",
+        "request": {"title": "Old Show", "tmdb_id": 111, "trigger": "seerr_webhook"},
+        "evidence": {"facts": {"canonical_title": "Old Show", "genres": ["Drama"]}},
+        "title": "Old Show",
+        "objective": {"resolution": "2160p", "confidence": "medium", "reasons": ["r"]},
+        "household": {"resolution": "2160p", "confidence": "medium", "reasons": ["r"]},
+        "final_resolution": "2160p",
+        "confidence": "medium",
+        "score": 3.75,
+        "score_components": [
+            {"name": "visual_genre", "contribution": 1.6, "note": "v1 weighted term"}
+        ],
+        "model_involvement": {
+            "used": True,
+            "provider": "openai_compat",
+            "prompt_version": "judge_v1",
+            "raw_output": "{}",
+        },
+    }
+    decision = Decision.model_validate(v1_json)
+    assert decision.score == 3.75
+    assert decision.model_involvement.household_hash is None
+    assert decision.model_involvement.attempts == []
+    assert decision.evidence.diskspace == []
+    store.save_decision(decision)
+    assert store.get_decision(decision.decision_id).score == 3.75
+    assert store.list_decisions()[0].decision_id == decision.decision_id
+    # and through the HTTP surface, not just the store
+    from resolute.api.app import create_app
+    from resolute.config import HouseholdPolicy, Settings
+    from resolute.engine.engine import DecisionEngine
+    from resolute.metadata.source import FixtureEvidenceSource
+
+    settings = Settings(db_path=":memory:")
+    engine = DecisionEngine(
+        settings, HouseholdPolicy(), FixtureEvidenceSource("fixtures/evidence")
+    )
+    client = TestClient(create_app(settings, HouseholdPolicy(), engine, store, None))
+    got = client.get(f"/api/decisions/{decision.decision_id}")
+    assert got.status_code == 200
+    assert got.json()["score"] == 3.75
+    assert got.json()["model_involvement"]["prompt_version"] == "judge_v1"
+    listed = client.get("/api/decisions").json()
+    assert listed[0]["decision_id"] == decision.decision_id
+
+
+def test_model_metrics_count_attempts_not_inferences(
+    settings, policy, evidence_source, store
+):
+    """Round-4 review: a retried inference is two billable provider calls and
+    must be metered as such, labeled by model."""
+    from conftest import make_verdict
+
+    from resolute.engine.engine import DecisionEngine
+    from resolute.judge.judge import Judge
+    from resolute.judge.provider import StaticProvider
+
+    provider = StaticProvider(['{"not": "the schema"}', make_verdict("2160p", "high")])
+    engine = DecisionEngine(settings, policy, evidence_source, judge=Judge(provider))
+    client = TestClient(create_app(settings, policy, engine, store, None))
+    assert (
+        client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
+        .status_code
+        == 200
+    )
+    metrics_text = TestClient(create_metrics_app(client.app.state.metrics)).get("/metrics").text
+    assert 'resolute_model_inferences_total{model="static-test"} 1' in metrics_text
+    assert 'resolute_model_calls_total{model="static-test"} 2' in metrics_text
+    assert "resolute_model_fallback_total" not in metrics_text  # retry succeeded
+
+
+def test_model_metrics_record_fallback(settings, policy, evidence_source, store):
+    from conftest import CannedProvider
+
+    from resolute.engine.engine import DecisionEngine
+    from resolute.judge.judge import Judge
+
+    engine = DecisionEngine(
+        settings, policy, evidence_source, judge=Judge(CannedProvider("junk"))
+    )
+    client = TestClient(create_app(settings, policy, engine, store, None))
+    client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
+    metrics_text = TestClient(create_metrics_app(client.app.state.metrics)).get("/metrics").text
+    assert 'resolute_model_fallback_total{model="canned-test"} 1' in metrics_text
+    assert 'resolute_model_calls_total{model="canned-test"} 2' in metrics_text

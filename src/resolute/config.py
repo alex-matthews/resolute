@@ -12,89 +12,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .schemas.core import AutomationMode
 
 
-class RequesterPolicy(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class HouseholdPolicy(BaseModel):
+    """Household preference as versioned prose (ADR-0003).
 
-    bias_2160p: float = 0.0  # additive score bias, positive favors 2160p
-    note: str | None = None
-
-
-class PolicyWeights(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    visual_genre: float = 1.6
-    network_tier: float = 1.0
-    era: float = 0.8
-    acclaim: float = 1.0
-    episode_burden: float = 1.4
-    requester_preference: float = 1.0
-    franchise_priority: float = 3.0
-    storage_pressure: float = 1.2
-
-
-class PolicyThresholds(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    uhd_score: float = 2.0  # score >= uhd_score -> 2160p
-    hd_score: float = -0.5  # score <= hd_score -> 1080p; between -> ambiguous
-    high_confidence_margin: float = 1.5  # distance beyond threshold for high confidence
-
-
-class Policy(BaseModel):
-    """Household policy vocabulary. Small, editable, versioned in git."""
+    The file is ordinary text/markdown — showcase genres, children's content,
+    franchises, space sensitivity, whatever the household cares about — and it
+    names household members, so it is sensitive runtime configuration (Secret
+    mount), not a published ConfigMap. Disagreeing with recurring decisions
+    means editing this prose, not calibrating weights."""
 
     model_config = ConfigDict(extra="forbid")
 
-    version: int = 1
-    storage_pressure: str = "low"  # low | medium | high
-    max_episodes_2160p: int = 80  # above this, 2160p requires high confidence
+    prose: str = ""
+    source_path: str | None = None
 
-    weights: PolicyWeights = Field(default_factory=PolicyWeights)
-    thresholds: PolicyThresholds = Field(default_factory=PolicyThresholds)
+    @property
+    def content_hash(self) -> str:
+        """Stable fingerprint stored with each decision for audit; the prose
+        itself never leaves the runtime."""
+        import hashlib
 
-    # Genre vocabulary (lowercase match against TMDB genres/keywords).
-    visual_genres: list[str] = Field(
-        default_factory=lambda: [
-            "documentary",
-            "sci-fi & fantasy",
-            "science fiction",
-            "animation",
-            "action & adventure",
-            "war & politics",
-        ]
-    )
-    low_payoff_genres: list[str] = Field(
-        default_factory=lambda: ["talk", "news", "reality", "soap", "comedy"]
-    )
-    premium_networks: list[str] = Field(
-        default_factory=lambda: [
-            "hbo",
-            "max",
-            "apple tv+",
-            "netflix",
-            "disney+",
-            "amazon",
-            "prime video",
-        ]
-    )
-
-    # Hard overrides: guardrails pin these regardless of score or judge opinion.
-    franchises_2160p: list[str] = Field(default_factory=list)
-    titles_1080p: list[str] = Field(default_factory=list)
-
-    requesters: dict[str, RequesterPolicy] = Field(default_factory=dict)
-
-    feedback_reason_tags: list[str] = Field(
-        default_factory=lambda: [
-            "showcase",
-            "background_watch",
-            "storage",
-            "prestige_exception",
-            "kids_content",
-            "rewatch_favorite",
-            "bad_metadata",
-        ]
-    )
+        return hashlib.sha256(self.prose.encode()).hexdigest()[:16]
 
 
 class SeerrSettings(BaseModel):
@@ -135,6 +73,13 @@ class DowngradeSettings(BaseModel):
 
 
 class JudgeSettings(BaseModel):
+    """The primary decision model (ADR-0003). Settings key stays `judge` so
+    the deployed RESOLUTE_JUDGE__* env surface survives the v2 cutover.
+
+    With the model disabled or unreachable, Resolute runs degraded: every
+    normal decision takes the conservative fallback (1080p + hold, no write).
+    That is deliberate — there is no second, deterministic decision engine."""
+
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
@@ -143,8 +88,9 @@ class JudgeSettings(BaseModel):
     api_key: str = ""
     model: str = "claude-haiku-4-5"
     timeout_seconds: float = 30.0
-    # Only consult the judge inside the ambiguous score band unless force_judge is set.
-    judge_ambiguous_only: bool = True
+    # v1 relic, accepted and ignored: a deployed RESOLUTE_JUDGE__JUDGE_AMBIGUOUS_ONLY
+    # or config-file key must not crash startup on upgrade (extra="forbid" would).
+    judge_ambiguous_only: bool | None = None
 
 
 class Settings(BaseSettings):
@@ -171,7 +117,9 @@ class Settings(BaseSettings):
     api_token: str = ""
 
     db_path: Path = Path("data/resolute.db")
-    policy_path: Path = Path("config/policy.yaml")
+    # Household preference prose (ADR-0003). Sensitive: mounted from a Secret,
+    # not a git ConfigMap — it names household members.
+    household_policy_path: Path = Path("config/household.md")
 
     listen_host: str = "0.0.0.0"
     listen_port: int = 8080
@@ -213,24 +161,25 @@ def load_settings(config_file: str | os.PathLike[str] | None = None) -> Settings
     return Settings(**file_values)
 
 
-def load_policy(path: str | os.PathLike[str], required: bool = False) -> Policy:
-    """Load the household policy file.
+def load_household_policy(
+    path: str | os.PathLike[str], required: bool = False
+) -> HouseholdPolicy:
+    """Load the household preference prose (ADR-0003).
 
     `required=True` is the production serve path: the image deliberately
-    ships no policy file, so a missing file there means the ConfigMap
-    mount is broken and the service must fail fast instead of silently
-    scoring with defaults. Ad-hoc CLI/fixture runs keep the tolerant
-    default-policy behavior.
+    ships no household file, so a missing file there means the Secret mount
+    is broken and the service must fail fast instead of silently deciding
+    with no household voice. Ad-hoc CLI/fixture runs tolerate its absence
+    (empty prose: the model decides on evidence alone).
     """
     p = Path(path)
     if not p.is_file():
         if required:
             raise FileNotFoundError(
-                f"policy file not found at {p}: mount the resolute-policy "
-                "ConfigMap at /config/policy.yaml (or set "
-                "RESOLUTE_POLICY_PATH). The image deliberately ships no "
-                "policy file."
+                f"household policy file not found at {p}: mount the "
+                "resolute-household Secret at /config/household.md (or set "
+                "RESOLUTE_HOUSEHOLD_POLICY_PATH). The image deliberately "
+                "ships no household file."
             )
-        return Policy()
-    data = yaml.safe_load(p.read_text()) or {}
-    return Policy(**data)
+        return HouseholdPolicy()
+    return HouseholdPolicy(prose=p.read_text(), source_path=str(p))

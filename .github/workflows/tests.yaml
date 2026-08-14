@@ -49,7 +49,7 @@ jobs:
       - name: Run unit tests
         run: mise run test
 
-      - name: Run golden decision fixtures
+      - name: Run canned-verdict pipeline fixtures
         run: mise run golden
 
   build:

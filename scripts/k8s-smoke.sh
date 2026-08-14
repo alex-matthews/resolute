@@ -6,7 +6,7 @@
 #   - read-only root filesystem, all capabilities dropped
 #   - no usable HOME
 #   - only the mounted /data writable
-#   - policy mounted read-only (the image ships none)
+#   - household prose mounted read-only (the image ships none)
 # Asserts /healthz and /readyz answer 200, the DB lands in /data, and the
 # logs are free of errors.
 set -euo pipefail
@@ -38,7 +38,7 @@ docker run -d --name "$NAME" \
   --security-opt no-new-privileges \
   -e HOME=/nonexistent \
   -v "$tmp/data:/data" \
-  -v "$PWD/config/policy.example.yaml:/config/policy.yaml:ro" \
+  -v "$PWD/config/household.example.md:/config/household.md:ro" \
   -p "127.0.0.1:$PORT:8080" \
   "$IMAGE" >/dev/null
 

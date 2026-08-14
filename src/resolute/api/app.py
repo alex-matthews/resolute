@@ -13,17 +13,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .. import __version__
-from ..config import Policy, Settings
+from ..config import HouseholdPolicy, Settings
 from ..engine.engine import DecisionEngine
-from ..engine.features import extract_features
-from ..engine.policy import prescore
 from ..executor import ExecutionBlocked, ExecutionFailed, Executor
 from ..metadata.source import facts_from_seerr_tv, resolve_tv_by_tvdb
 from ..schemas import (
     AutomationMode,
     Decision,
     DecisionRequest,
-    EvidenceBundle,
     FeedbackIn,
     Resolution,
 )
@@ -101,7 +98,7 @@ def create_metrics_app(metrics: Counter[str]) -> FastAPI:
 
 def create_app(
     settings: Settings,
-    policy: Policy,
+    household: HouseholdPolicy,
     engine: DecisionEngine,
     store: Store,
     executor: Executor | None = None,
@@ -128,10 +125,29 @@ def create_app(
                 return JSONResponse({"detail": "invalid api token"}, status_code=401)
             return await call_next(request)
 
+    def _record_model_metrics(involvement, fell_back: bool) -> None:
+        if not involvement.used:
+            return
+        label = f'model="{involvement.model or "unknown"}"'
+        metrics[f"model_inferences_total{{{label}}}"] += 1
+        # Billable granularity: one provider call per attempt (a retry is a
+        # second spend), not one per inference.
+        metrics[f"model_calls_total{{{label}}}"] += max(1, len(involvement.attempts))
+        if fell_back:
+            metrics[f"model_fallback_total{{{label}}}"] += 1
+        if involvement.latency_ms:
+            metrics["model_latency_ms_sum"] += involvement.latency_ms
+            metrics["model_latency_ms_count"] += 1
+        if involvement.tokens_in:
+            metrics['model_tokens_total{direction="in"}'] += involvement.tokens_in
+        if involvement.tokens_out:
+            metrics['model_tokens_total{direction="out"}'] += involvement.tokens_out
+
     def _decide_and_store(request: DecisionRequest, mode: AutomationMode | None) -> Decision:
         decision = engine.decide(request, mode)
         store.save_decision(decision)
         metrics[f"decisions_total{{resolution=\"{decision.final_resolution}\"}}"] += 1
+        _record_model_metrics(decision.model_involvement, decision.verdict is None)
         return decision
 
     # -- health / observability -------------------------------------------
@@ -282,12 +298,6 @@ def create_app(
     def post_feedback(body: FeedbackIn) -> dict:
         if store.get_decision(body.decision_id) is None:
             raise HTTPException(404, "decision not found")
-        if body.reason_tag and body.reason_tag not in policy.feedback_reason_tags:
-            raise HTTPException(
-                422,
-                f"unknown reason_tag '{body.reason_tag}';"
-                f" allowed: {policy.feedback_reason_tags}",
-            )
         record = store.save_feedback(body)
         metrics["feedback_total"] += 1
         return {"feedback_id": record.feedback_id, "decision_id": record.decision_id}
@@ -342,10 +352,15 @@ def create_app(
 
     @app.get("/api/titles/{tvdb_id}/objective-worth")
     def objective_worth(tvdb_id: int, tmdb_id: int | None = None, title: str | None = None) -> dict:
-        """Objective lane only, computed on demand; records no decision.
-        Never the household lane (ADR-0002: the council owns those terms).
-        Degrades to worth=unavailable instead of erroring, so a Costanza case
-        assembles without this evidence rather than blocking on it."""
+        """Objective lane only, model-derived (ADR-0003 amending ADR-0002).
+
+        The invocation is objective-only by contract: judge_objective() takes
+        show facts and nothing else — no household prose, requester, storage,
+        or feedback can reach this prompt. Does not mutate request or media
+        state, creates no profile decision, triggers no write; it does append
+        an inference-audit record. Degrades to worth=unavailable (metadata OR
+        model failure) so a Costanza case assembles without this evidence
+        rather than blocking on it."""
         if seerr is None:
             raise HTTPException(503, "no Seerr client configured")
 
@@ -379,19 +394,49 @@ def create_app(
             }
 
         facts = facts_from_seerr_tv(tv)
-        bundle = EvidenceBundle(facts=facts, sources=[f"seerr:/tv/{facts.tmdb_id}"])
-        features = extract_features(DecisionRequest(tvdb_id=tvdb_id), bundle, policy)
-        pre = prescore(features, policy)
+        judge = engine.judge
+        if judge is None:
+            metrics["worth_unavailable_total"] += 1
+            return {
+                "tvdb_id": tvdb_id,
+                "tmdb_id": facts.tmdb_id,
+                "title": facts.canonical_title,
+                "worth": "unavailable",
+                "reason": "model disabled; objective judgment requires the model (ADR-0003)",
+            }
+
+        verdict, involvement = judge.judge_objective(facts)
+        _record_model_metrics(involvement, verdict is None)
+        # Auditing is mandatory (ADR-0003): it compensates for lost
+        # reproducibility. An audit row, never a decision.
+        store.save_audit(
+            {
+                "type": "objective_worth_inference",
+                "tvdb_id": tvdb_id,
+                "tmdb_id": facts.tmdb_id,
+                "outcome": "ok" if verdict is not None else "model_unavailable",
+                "involvement": involvement.model_dump(mode="json"),
+            }
+        )
+        if verdict is None:
+            metrics["worth_unavailable_total"] += 1
+            return {
+                "tvdb_id": tvdb_id,
+                "tmdb_id": facts.tmdb_id,
+                "title": facts.canonical_title,
+                "worth": "unavailable",
+                "reason": f"model unavailable or invalid output: {involvement.error}",
+            }
+
         metrics["worth_total"] += 1
         return {
             "tvdb_id": tvdb_id,
             "tmdb_id": facts.tmdb_id,
             "title": facts.canonical_title,
-            "worth": pre.objective.resolution,
-            "objective_score": pre.objective_score,
-            "confidence": pre.objective.confidence,
-            "reasons": pre.objective.reasons,
-            "metadata_gaps": features.metadata_gaps,
+            "worth": verdict.objective.resolution,
+            "confidence": verdict.objective.confidence,
+            "reasons": verdict.objective.reasons,
+            "risk_flags": verdict.risk_flags,
         }
 
     # -- downgrades (ADR-0002 executor: report-only default) ---------------------

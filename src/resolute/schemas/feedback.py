@@ -1,4 +1,5 @@
-"""Feedback records: household overrides feeding future calibration."""
+"""Feedback records: the shadow-mode disagreement signal (ADR-0003 —
+prose editing is the calibration mechanism)."""
 
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ class FeedbackIn(BaseModel):
 
     decision_id: str
     verdict: FeedbackVerdict
-    reason_tag: str | None = None  # must match policy.feedback_reason_tags when set
+    reason_tag: str | None = None  # free text (the v1 taxonomy died with ADR-0003)
     comment: str | None = None
     source: str = "api"
 

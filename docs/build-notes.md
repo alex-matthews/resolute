@@ -1,5 +1,10 @@
 # Build notes
 
+> Dated decision history. The policy.yaml/`load_policy` ConfigMap flow
+> described below was the v1 design; ADR-0003 replaced it with Secret-mounted
+> household prose (`load_household_policy`). The container-identity and
+> workflow decisions stand.
+
 ## Ops reset (2026-07-05, external review "Prompt A")
 
 Shared container-identity flaws with Costanza, fixed here in the same

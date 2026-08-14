@@ -1,4 +1,4 @@
-"""CLI: same decision engine as the API, plus calibration and ops helpers."""
+"""CLI: same decision engine as the API, plus shadow-review and ops helpers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from .config import load_policy, load_settings
+from .config import load_household_policy, load_settings
 from .engine.engine import DecisionEngine
 from .metadata.source import FixtureEvidenceSource
 from .schemas import (
@@ -30,17 +30,17 @@ _fixtures_option = typer.Option(
 
 
 def _build(config: str | None, fixtures: str | None):
-    """Build (settings, policy, engine, store): live by default, offline with --fixtures."""
+    """Build (settings, household, engine, store): live by default, offline with --fixtures."""
     if fixtures:
         settings = load_settings(config)
-        policy = load_policy(settings.policy_path)
-        engine = DecisionEngine(settings, policy, FixtureEvidenceSource(fixtures))
+        household = load_household_policy(settings.household_policy_path)
+        engine = DecisionEngine(settings, household, FixtureEvidenceSource(fixtures))
         store = Store(settings.db_path)
-        return settings, policy, engine, store
+        return settings, household, engine, store
     from .runtime import build_runtime
 
     rt = build_runtime(config)
-    return rt.settings, rt.policy, rt.engine, rt.store
+    return rt.settings, rt.household, rt.engine, rt.store
 
 
 def _print_decision(decision: Decision, as_json: bool) -> None:
@@ -51,7 +51,9 @@ def _print_decision(decision: Decision, as_json: bool) -> None:
     typer.echo(f"title    : {decision.title} ({decision.year})")
     typer.echo(f"final    : {decision.final_resolution}  confidence={decision.confidence}")
     typer.echo(f"objective: {decision.objective.resolution}  household: {decision.household.resolution}")
-    typer.echo(f"score    : {decision.score}  mode={decision.mode}")
+    typer.echo(f"mode     : {decision.mode}")
+    if decision.score:  # v1 records only; v2 decisions carry no score
+        typer.echo(f"score    : {decision.score} (v1 deterministic record)")
     if decision.risk_flags:
         typer.echo(f"risks    : {', '.join(decision.risk_flags)}")
     if decision.shadow_delta:
@@ -73,7 +75,6 @@ def decide(
     requester: str | None = typer.Option(None),
     tmdb_id: int | None = typer.Option(None),
     mode: AutomationMode | None = typer.Option(None),
-    force_judge: bool = typer.Option(False, help="Consult the LLM judge even if unambiguous"),
     as_json: bool = typer.Option(False, "--json"),
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
@@ -87,7 +88,6 @@ def decide(
         requester=requester,
         tmdb_id=tmdb_id,
         trigger=TriggerSource.MANUAL_CLI,
-        force_judge=force_judge,
     )
     decision = engine.decide(request, mode)
     store.save_decision(decision)
@@ -398,20 +398,14 @@ def feedback(
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
 ) -> None:
-    """Record household feedback on a decision (e.g. `feedback last prefer_2160p --reason-tag showcase`)."""
-    _, policy, _, store = _build(config, fixtures)
+    """Record household feedback on a decision; the shadow-mode signal for editing the household prose."""
+    _, _, _, store = _build(config, fixtures)
     if decision_id == "last":
         last = store.last_decision()
         if last is None:
             typer.echo("no decisions recorded yet", err=True)
             raise typer.Exit(1)
         decision_id = last.decision_id
-    if reason_tag and reason_tag not in policy.feedback_reason_tags:
-        typer.echo(
-            f"unknown reason tag '{reason_tag}'; allowed: {policy.feedback_reason_tags}",
-            err=True,
-        )
-        raise typer.Exit(1)
     record = store.save_feedback(
         FeedbackIn(
             decision_id=decision_id,
@@ -429,7 +423,7 @@ def calibrate(
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
 ) -> None:
-    """Print the calibration summary (decision mix, agreement rate, override clusters)."""
+    """Print the shadow-review summary (decision mix, model/household agreement rate)."""
     _, _, _, store = _build(config, fixtures)
     typer.echo(json.dumps(store.calibration_summary(), indent=2))
 
@@ -440,7 +434,7 @@ def review_overrides(
     config: str | None = _config_option,
     fixtures: str | None = _fixtures_option,
 ) -> None:
-    """List decisions the household disagreed with, newest first."""
+    """List decisions the household disagreed with, newest first — where the\n    prose needs editing (ADR-0003: shadow mode is the calibration method)."""
     _, _, _, store = _build(config, fixtures)
     rows = store.overrides(limit=limit)
     if not rows:
@@ -454,33 +448,152 @@ def review_overrides(
         )
 
 
+@app.command("eval")
+def eval_models(
+    cases: str = typer.Option("fixtures/eval/cases.json", "--cases"),
+    repeat: int = typer.Option(3, help="Runs per case; stability is judged across them"),
+    report: str | None = typer.Option(
+        None, "--report", help="Report path (default <db_path dir>/eval-reports/<timestamp>.json)"
+    ),
+    config: str | None = _config_option,
+) -> None:
+    """Run the model-eval suite against the CONFIGURED LIVE model (spends money).
+
+    CI proves the safety plumbing with canned verdicts; this proves the thing
+    inside the rails: acceptable-set membership, hold expectations, repeat
+    stability, and cross-case invariants (does requester/space/prose actually
+    change outcomes?). Writes a durable report identifying model, prompt,
+    household hash, corpus hash, and commit. See docs/testing.md."""
+    from .evaluation import build_report, check_invariants, evaluate_cases
+    from .judge.judge import Judge
+    from .judge.provider import OpenAICompatProvider
+
+    settings = load_settings(config)
+    if not settings.judge.enabled or settings.judge.provider != "openai_compat":
+        typer.echo(
+            "eval needs the live model: set judge.enabled=true and provider"
+            " openai_compat (this command deliberately spends provider money)",
+            err=True,
+        )
+        raise typer.Exit(1)
+    # Same requirement as production serve: evaluating against accidentally
+    # empty household prose would validate the wrong policy.
+    household = load_household_policy(settings.household_policy_path, required=True)
+    judge = Judge(
+        OpenAICompatProvider(
+            base_url=settings.judge.base_url,
+            api_key=settings.judge.api_key,
+            model=settings.judge.model,
+            timeout_seconds=settings.judge.timeout_seconds,
+        )
+    )
+    corpus_raw = Path(cases).read_text()
+    corpus = json.loads(corpus_raw)
+    case_list = corpus["cases"] if isinstance(corpus, dict) else corpus
+    invariants = corpus.get("invariants", []) if isinstance(corpus, dict) else []
+
+    results = evaluate_cases(case_list, judge, settings, household, repeat=repeat)
+    invariant_results = check_invariants(results, invariants)
+
+    failures = 0
+    for r in results:
+        status = "PASS" if r.passed else "FAIL"
+        outcomes = ", ".join(f"{res}{'(held)' if held else ''}" for res, held in r.outcomes)
+        typer.echo(f"[{status}] {r.name}: {outcomes}")
+        for note in r.notes:
+            typer.echo(f"       note: {note}")
+        failures += 0 if r.passed else 1
+    for inv in invariant_results:
+        status = "PASS" if inv.passed else "FAIL"
+        typer.echo(f"[{status}] invariant {inv.description}: {inv.detail}")
+        failures += 0 if inv.passed else 1
+
+    doc = build_report(
+        corpus_path=cases,
+        corpus_raw=corpus_raw,
+        settings=settings,
+        household=household,
+        repeat=repeat,
+        results=results,
+        invariant_results=invariant_results,
+    )
+    # Default under the writable data volume (db_path's directory): in-cluster
+    # the rootfs is read-only and only /data and /tmp are writable, so a
+    # CWD-relative default would spend the model budget and then fail to save.
+    stamp = doc["generated_at"].replace(":", "").replace("+0000", "Z")
+    out_path = Path(
+        report or Path(settings.db_path).parent / "eval-reports" / f"eval-{stamp}.json"
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(doc, indent=2) + "\n")
+
+    summary = doc["summary"]
+    typer.echo(
+        f"{summary['cases_passed']}/{summary['cases_total']} cases,"
+        f" {summary['invariants_passed']}/{summary['invariants_total']} invariants"
+        f" | {settings.judge.model} @ {doc['model']['prompt_version']}"
+        f" | household {doc['household_hash']} | corpus {doc['corpus']['sha256']}"
+        f" | {summary['total_latency_ms']} ms | {summary['total_tokens']} tokens"
+    )
+    typer.echo(f"report: {out_path}")
+    if failures:
+        raise typer.Exit(1)
+
+
 @app.command("fixtures-test")
 def fixtures_test(
     fixtures: str = typer.Option("fixtures/evidence", "--fixtures"),
-    golden: str = typer.Option("fixtures/golden/expectations.json", "--golden"),
+    golden: str = typer.Option(
+        "fixtures/golden/expectations.json", "--cases", "--golden"
+    ),
     config: str | None = _config_option,
 ) -> None:
-    """Run golden expectations against fixture evidence. Exit 1 on any mismatch."""
+    """Run golden expectations against fixture evidence. Exit 1 on any mismatch.
+
+    v2 (ADR-0003): golden cases are pipeline regressions, not a taste oracle.
+    A case with a canned "verdict" runs it through the rails and planner; a
+    case without one exercises the metadata floor / conservative fallback."""
+    from .judge.judge import Judge
+    from .judge.provider import StaticProvider
+
     settings = load_settings(config)
-    policy = load_policy(settings.policy_path)
-    engine = DecisionEngine(settings, policy, FixtureEvidenceSource(fixtures))
+    household = load_household_policy(settings.household_policy_path)
     cases = json.loads(Path(golden).read_text())
     failures = 0
     for case in cases:
+        canned = case.get("verdict")
+        judge = Judge(StaticProvider([json.dumps(canned)])) if canned else None
+        engine = DecisionEngine(
+            settings, household, FixtureEvidenceSource(fixtures), judge=judge
+        )
         request = DecisionRequest(**case["request"])
         decision = engine.decide(request, AutomationMode.SHADOW)
         expected = Resolution(case["expected_resolution"])
         expect_hold = bool(case.get("expect_hold", False))
-        held = any("hold" in a.type or a.type == "insufficient_metadata" for a in decision.action_plan)
+        held = any(
+            "hold" in a.type or a.type == "insufficient_metadata"
+            for a in decision.action_plan
+        )
         ok = decision.final_resolution is expected and held == expect_hold
+        detail = ""
+        if "expect_actions" in case:
+            got_actions = [a.type.value for a in decision.action_plan]
+            if got_actions != case["expect_actions"]:
+                ok = False
+                detail = f" plan={got_actions} want={case['expect_actions']}"
+        if "expect_approval_flags" in case:
+            got_flags = [a.requires_approval for a in decision.action_plan]
+            if got_flags != case["expect_approval_flags"]:
+                ok = False
+                detail += f" approvals={got_flags} want={case['expect_approval_flags']}"
         status = "PASS" if ok else "FAIL"
         typer.echo(
             f"[{status}] {case.get('name', request.identity_hint())}: "
             f"got {decision.final_resolution} hold={held}, "
-            f"want {expected} hold={expect_hold}"
+            f"want {expected} hold={expect_hold}{detail}"
         )
         failures += 0 if ok else 1
-    typer.echo(f"{len(cases) - failures}/{len(cases)} golden cases passed")
+    typer.echo(f"{len(cases) - failures}/{len(cases)} pipeline cases passed")
     if failures:
         raise typer.Exit(1)
 
@@ -513,7 +626,7 @@ def serve(
 
     rt = build_runtime(config)
     api = create_app(
-        rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr, rt.sonarr
+        rt.settings, rt.household, rt.engine, rt.store, rt.executor, rt.seerr, rt.sonarr
     )
     bind_host = host or rt.settings.listen_host
     log_level = rt.settings.log_level.lower()

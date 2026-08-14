@@ -1,38 +1,277 @@
 [
     {
-        "name": "severance: premium visual prestige -> 2160p",
-        "request": {"title": "Severance", "year": 2022, "tmdb_id": 95396},
+        "name": "canned 2160p high verdict -> audit-only plan (no pending request)",
+        "request": {
+            "title": "Severance",
+            "year": 2022,
+            "tmdb_id": 95396
+        },
+        "verdict": {
+            "objective": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "reasons": [
+                    "prestige visuals, true UHD master"
+                ]
+            },
+            "household": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "reasons": [
+                    "household showcase pick"
+                ]
+            },
+            "automation": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "action": "set_seerr_request_profile_2160p"
+            },
+            "risk_flags": [],
+            "questions": []
+        },
         "expected_resolution": "2160p",
-        "expect_hold": false
+        "expect_hold": false,
+        "expect_actions": [
+            "audit_sonarr_series_profile"
+        ],
+        "expect_approval_flags": [
+            false
+        ]
     },
     {
-        "name": "friends: archival long-running sitcom -> 1080p",
-        "request": {"title": "Friends", "year": 1994, "tmdb_id": 1668},
+        "name": "canned 1080p high verdict -> audit-only plan",
+        "request": {
+            "title": "Friends",
+            "year": 1994,
+            "tmdb_id": 1668
+        },
+        "verdict": {
+            "objective": {
+                "resolution": "1080p",
+                "confidence": "high",
+                "reasons": [
+                    "pre-HD era source"
+                ]
+            },
+            "household": {
+                "resolution": "1080p",
+                "confidence": "high",
+                "reasons": [
+                    "background rewatch"
+                ]
+            },
+            "automation": {
+                "resolution": "1080p",
+                "confidence": "high",
+                "action": "set_seerr_request_profile_1080p"
+            },
+            "risk_flags": [],
+            "questions": []
+        },
         "expected_resolution": "1080p",
-        "expect_hold": false
+        "expect_hold": false,
+        "expect_actions": [
+            "audit_sonarr_series_profile"
+        ],
+        "expect_approval_flags": [
+            false
+        ]
     },
     {
-        "name": "the bear: story-led ambiguous -> lean 1080p, hold for review",
-        "request": {"title": "The Bear", "year": 2022, "tmdb_id": 136315},
+        "name": "canned hold_for_manual_review action -> hold plan",
+        "request": {
+            "title": "The Bear",
+            "year": 2022,
+            "tmdb_id": 136315
+        },
+        "verdict": {
+            "objective": {
+                "resolution": "1080p",
+                "confidence": "medium",
+                "reasons": [
+                    "story-led"
+                ]
+            },
+            "household": {
+                "resolution": "1080p",
+                "confidence": "medium",
+                "reasons": [
+                    "torn; asking the household"
+                ]
+            },
+            "automation": {
+                "resolution": "1080p",
+                "confidence": "medium",
+                "action": "hold_for_manual_review"
+            },
+            "risk_flags": [
+                "near_threshold"
+            ],
+            "questions": [
+                "is this a good-screen show for you?"
+            ]
+        },
         "expected_resolution": "1080p",
-        "expect_hold": true
+        "expect_hold": true,
+        "expect_actions": [
+            "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false
+        ]
     },
     {
-        "name": "planet earth ii: nature documentary showcase -> 2160p",
-        "request": {"title": "Planet Earth II", "year": 2016, "tmdb_id": 68595},
+        "name": "canned 2160p verdict + pending Seerr request -> profile+approve+audit plan",
+        "request": {
+            "title": "Planet Earth II",
+            "year": 2016,
+            "tmdb_id": 68595,
+            "seerr_request_id": 123
+        },
+        "verdict": {
+            "objective": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "reasons": [
+                    "the reason 4K exists"
+                ]
+            },
+            "household": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "reasons": [
+                    "household loves nature docs"
+                ]
+            },
+            "automation": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "action": "set_seerr_request_profile_2160p"
+            },
+            "risk_flags": [],
+            "questions": []
+        },
         "expected_resolution": "2160p",
-        "expect_hold": false
+        "expect_hold": false,
+        "expect_actions": [
+            "set_seerr_request_profile_2160p",
+            "approve_seerr_request",
+            "audit_sonarr_series_profile"
+        ],
+        "expect_approval_flags": [
+            true,
+            true,
+            false
+        ]
     },
     {
-        "name": "star wars visions: priority franchise -> 2160p",
-        "request": {"title": "Star Wars: Visions", "year": 2021, "tmdb_id": 114478},
+        "name": "canned 2160p verdict (second audit-only wiring case)",
+        "request": {
+            "title": "Star Wars: Visions",
+            "year": 2021,
+            "tmdb_id": 114478
+        },
+        "verdict": {
+            "objective": {
+                "resolution": "2160p",
+                "confidence": "medium",
+                "reasons": [
+                    "stylized animation showcase"
+                ]
+            },
+            "household": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "reasons": [
+                    "Star Wars gets top quality per household prose"
+                ]
+            },
+            "automation": {
+                "resolution": "2160p",
+                "confidence": "high",
+                "action": "set_seerr_request_profile_2160p"
+            },
+            "risk_flags": [],
+            "questions": []
+        },
         "expected_resolution": "2160p",
-        "expect_hold": false
+        "expect_hold": false,
+        "expect_actions": [
+            "audit_sonarr_series_profile"
+        ],
+        "expect_approval_flags": [
+            false
+        ]
     },
     {
-        "name": "unknown show without metadata -> safe 1080p, hold",
-        "request": {"tmdb_id": 999999},
+        "name": "low-confidence verdict -> rails hold",
+        "request": {
+            "title": "Severance",
+            "year": 2022,
+            "tmdb_id": 95396
+        },
+        "verdict": {
+            "objective": {
+                "resolution": "2160p",
+                "confidence": "low",
+                "reasons": [
+                    "unsure"
+                ]
+            },
+            "household": {
+                "resolution": "2160p",
+                "confidence": "low",
+                "reasons": [
+                    "unsure"
+                ]
+            },
+            "automation": {
+                "resolution": "2160p",
+                "confidence": "low",
+                "action": "set_seerr_request_profile_2160p"
+            },
+            "risk_flags": [],
+            "questions": []
+        },
+        "expected_resolution": "2160p",
+        "expect_hold": true,
+        "expect_actions": [
+            "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false
+        ]
+    },
+    {
+        "name": "metadata floor: empty evidence -> insufficient_metadata + hold, no model call",
+        "request": {
+            "tmdb_id": 999999
+        },
         "expected_resolution": "1080p",
-        "expect_hold": true
+        "expect_hold": true,
+        "expect_actions": [
+            "insufficient_metadata",
+            "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false,
+            false
+        ]
+    },
+    {
+        "name": "model unavailable -> conservative fallback hold",
+        "request": {
+            "title": "Friends",
+            "year": 1994,
+            "tmdb_id": 1668
+        },
+        "expected_resolution": "1080p",
+        "expect_hold": true,
+        "expect_actions": [
+            "hold_for_manual_review"
+        ],
+        "expect_approval_flags": [
+            false
+        ]
     }
 ]

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from .config import Policy, Settings, load_policy, load_settings
+from .config import HouseholdPolicy, Settings, load_household_policy, load_settings
 from .engine.engine import DecisionEngine
 from .executor import Executor
 from .judge.judge import Judge
@@ -22,7 +22,7 @@ from .store.db import Store
 @dataclass
 class Runtime:
     settings: Settings
-    policy: Policy
+    household: HouseholdPolicy
     engine: DecisionEngine
     store: Store
     executor: Executor
@@ -36,7 +36,7 @@ def build_runtime(config_file: str | None = None) -> Runtime:
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    policy = load_policy(settings.policy_path, required=True)
+    household = load_household_policy(settings.household_policy_path, required=True)
 
     seerr = SeerrClient(settings.seerr.url, settings.seerr.api_key)
     sonarr = (
@@ -45,6 +45,11 @@ def build_runtime(config_file: str | None = None) -> Runtime:
         else None
     )
 
+    if not settings.judge.enabled:
+        logging.getLogger(__name__).warning(
+            "model disabled: every normal decision will take the conservative "
+            "fallback (1080p + hold) — ADR-0003 degraded operation"
+        )
     judge = None
     if settings.judge.enabled and settings.judge.provider == "openai_compat":
         judge = Judge(
@@ -58,7 +63,7 @@ def build_runtime(config_file: str | None = None) -> Runtime:
 
     engine = DecisionEngine(
         settings=settings,
-        policy=policy,
+        household=household,
         evidence_source=LiveEvidenceSource(seerr, sonarr),
         judge=judge,
     )
@@ -66,7 +71,7 @@ def build_runtime(config_file: str | None = None) -> Runtime:
     executor = Executor(settings, seerr=seerr, sonarr=sonarr)
     return Runtime(
         settings=settings,
-        policy=policy,
+        household=household,
         engine=engine,
         store=store,
         executor=executor,
@@ -80,5 +85,5 @@ def create_production_app(config_file: str | None = None):
 
     rt = build_runtime(config_file)
     return create_app(
-        rt.settings, rt.policy, rt.engine, rt.store, rt.executor, rt.seerr, rt.sonarr
+        rt.settings, rt.household, rt.engine, rt.store, rt.executor, rt.seerr, rt.sonarr
     )

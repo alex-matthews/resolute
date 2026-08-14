@@ -60,7 +60,11 @@ def seerr_decision(settings, policy, evidence_source):
             return bundle
 
     def make(mode: AutomationMode, engine_settings=settings):
-        engine = DecisionEngine(engine_settings, policy, RequestEvidenceSource())
+        from conftest import canned_judge
+
+        engine = DecisionEngine(
+            engine_settings, policy, RequestEvidenceSource(), judge=canned_judge()
+        )
         return engine.decide(
             DecisionRequest(title="Severance", tmdb_id=95396, seasons=[1]), mode
         )
