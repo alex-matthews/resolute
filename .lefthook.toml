@@ -10,11 +10,41 @@ glob = ["*.py"]
 run = "uv run ruff format {staged_files}"
 stage_fixed = true
 
-# Keep generated release state out of oxfmt and out of the inherited command's
-# target list. If it were only .prettierignore'd, a commit staging just this file
-# would hand oxfmt an all-ignored list and fail with no target files.
+# Keep deliberately unnormalized JSON out of oxfmt and out of the inherited
+# command's target list. If these were only .prettierignore'd, a commit staging
+# just ignored files would hand oxfmt an empty list and fail with no targets.
+# cases.json is a separate, durable exclusion: eval reports hash its raw bytes,
+# so any future normalization must record that provenance boundary explicitly.
 [pre-commit.commands.format-json]
 glob = ["*.json", "*.json5", "*.jsonc"]
 run = "oxfmt {staged_files}"
 stage_fixed = true
-exclude = [".release-please-manifest.json"]
+exclude = [
+  ".release-please-manifest.json",
+  "fixtures/eval/cases.json",
+  "fixtures/evidence/tmdb_114478.json",
+  "fixtures/evidence/tmdb_136315.json",
+  "fixtures/evidence/tmdb_1668.json",
+  "fixtures/evidence/tmdb_68595.json",
+  "fixtures/evidence/tmdb_95396.json",
+  "fixtures/golden/expectations.json",
+  "fixtures/seerr/request_detail.json",
+  "fixtures/seerr/service_sonarr_detail.json",
+  "fixtures/seerr/tv_details_severance.json",
+  "fixtures/seerr/webhook_media_pending.json",
+  "fixtures/seerr/webhook_movie_pending.json",
+  "fixtures/sonarr/quality_profiles.json",
+  "fixtures/sonarr/series_severance.json",
+]
+
+# Defer the two existing YAML normalization diffs to a focused follow-up. Use
+# command-level exclusions as well as .prettierignore for the same empty-target
+# reason documented above.
+[pre-commit.commands.format-yaml]
+glob = ["*.yaml", "*.yml"]
+run = "oxfmt {staged_files}"
+stage_fixed = true
+exclude = [
+  "config/config.example.yaml",
+  "deploy/kubernetes/app/helmrelease.yaml",
+]

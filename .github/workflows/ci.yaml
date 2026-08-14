@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - "**.md"
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
 
 concurrency:
@@ -340,6 +341,10 @@ jobs:
           exit-code: "0"
 
       - name: Upload SARIF
+        # Fork pull requests receive a read-only token even when this job asks
+        # for security-events: write. Keep the scan in the required fan-in but
+        # skip only the upload that GitHub cannot authorize for forks.
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           sarif_file: trivy-fs.sarif

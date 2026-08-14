@@ -1,2 +1,24 @@
 *.toml
 .release-please-manifest.json
+
+# Eval reports hash this corpus as raw bytes. Normalize only as an explicit,
+# documented provenance boundary.
+fixtures/eval/cases.json
+
+# Deliberately deferred YAML/JSON normalization. Matching Lefthook command-level
+# exclusions prevent ignored-only staged sets from reaching oxfmt empty.
+config/config.example.yaml
+deploy/kubernetes/app/helmrelease.yaml
+fixtures/evidence/tmdb_114478.json
+fixtures/evidence/tmdb_136315.json
+fixtures/evidence/tmdb_1668.json
+fixtures/evidence/tmdb_68595.json
+fixtures/evidence/tmdb_95396.json
+fixtures/golden/expectations.json
+fixtures/seerr/request_detail.json
+fixtures/seerr/service_sonarr_detail.json
+fixtures/seerr/tv_details_severance.json
+fixtures/seerr/webhook_media_pending.json
+fixtures/seerr/webhook_movie_pending.json
+fixtures/sonarr/quality_profiles.json
+fixtures/sonarr/series_severance.json
