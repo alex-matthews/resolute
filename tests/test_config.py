@@ -5,9 +5,7 @@ from resolute.config import Settings
 from resolute.schemas import AutomationMode
 
 
-@pytest.mark.parametrize(
-    "mode", [AutomationMode.AUTO_PROFILE, AutomationMode.AUTO_APPROVE]
-)
+@pytest.mark.parametrize("mode", [AutomationMode.AUTO_PROFILE, AutomationMode.AUTO_APPROVE])
 def test_auto_write_modes_require_webhook_secret(mode):
     with pytest.raises(ValidationError, match="webhook_shared_secret"):
         Settings(mode=mode, allow_writes=True)

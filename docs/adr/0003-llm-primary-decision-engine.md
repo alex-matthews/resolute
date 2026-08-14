@@ -3,8 +3,8 @@
 Status: accepted
 Date: 2026-08-13
 
-Retains ADR-0001 in full; amends ADR-0002 in one place — the *mechanism
-premise* of the objective-worth endpoint; the downgrade executor, its gates,
+Retains ADR-0001 in full; amends ADR-0002 in one place — the _mechanism
+premise_ of the objective-worth endpoint; the downgrade executor, its gates,
 and its scope fence are untouched. See "Relationship to prior ADRs".
 
 ## Context
@@ -72,7 +72,7 @@ Two supporting decisions:
 The existing strict `ModelVerdict` is the starting contract, not a
 field-by-field commitment. v2 preserves what audit and planning need:
 structured recommendations, reasons, confidence, risk flags/questions, and a
-constrained automation result. It also preserves the *meaning* of the
+constrained automation result. It also preserves the _meaning_ of the
 objective vs household lanes — objective media-quality merit distinct from
 household-context judgment — because ADR-0002's worth seam depends on that
 distinction (see below). What is removed is the deterministic scoring
@@ -110,7 +110,7 @@ No other v1 pin, clamp, cap, threshold, or reason-taxonomy check is
 grandfathered in under the label "rail"; any future deterministic rule must
 justify itself individually, or it silently rebuilds the v1 tuning burden.
 
-The fallback is intentionally *degraded operation*, not a second decision
+The fallback is intentionally _degraded operation_, not a second decision
 engine. With the model unavailable, Resolute recommends 1080p and holds; it
 no longer makes normal decisions. Accepting this is part of the decision.
 
@@ -128,7 +128,7 @@ effect. This is a planner-shape decision recorded now, before any future
 executor exists to get it wrong.
 
 ADR-0002's Costanza downgrade executor is the deliberate exception in
-*behavior*, not in plan semantics: materializing an already-consented
+_behavior_, not in plan semantics: materializing an already-consented
 replacement is its purpose, so its profile change and monitored search remain
 separate audited steps executed together under its existing gates.
 
@@ -140,7 +140,7 @@ weighted objective lane. Removing the deterministic scoring engine removes
 that premise, and this ADR supersedes it explicitly rather than silently.
 
 **Retained contract:** a read-only, gracefully degrading evidence seam that
-returns the *objective lane only* — never household terms (Costanza
+returns the _objective lane only_ — never household terms (Costanza
 ADR-0011's rationale stands) — keyed by `tvdb_id` with the existing confirmed
 tvdb→tmdb mapping, degrading to `worth: unavailable` instead of erroring so a
 Costanza case assembles without it rather than blocking.
@@ -205,12 +205,12 @@ Houndarr, bespoke, or otherwise) and designs none inside Resolute.**
 The v2 judgment seam is intentionally shaped to later support:
 
 - choosing between the trusted SQP-1 and SQP-4 movie strategies — these are
-  *strategies*, not rungs; direction is not labeled "upgrade"/"downgrade",
+  _strategies_, not rungs; direction is not labeled "upgrade"/"downgrade",
   and merit is not inferred from resolution, file size, or lossless audio
   alone;
 - a secondary, externally triggered existing-library audit for an individual
   title or bounded batch;
-- recommending or applying a profile correction *without* automatically
+- recommending or applying a profile correction _without_ automatically
   searching (the distinct-verbs rule above).
 
 Constraints on that future work: it must deliberately amend ADR-0002's
@@ -269,7 +269,7 @@ handling are all out of scope here.
   operation.
 - **Prompt injection remains an exposure**, bounded by strict schemas, the
   trusted-profile enum, the planner, and the executor gates — the worst-case
-  *action class* is v1's: a wrong trusted profile and its downstream
+  _action class_ is v1's: a wrong trusted profile and its downstream
   acquisition cost, or a hold. The
   exposed surface is nonetheless larger: v1's judge adjudicated only
   ambiguous-band cases, while v2's model decides every normal case, so
@@ -285,7 +285,7 @@ handling are all out of scope here.
 ## Open questions (deliberately not settled here)
 
 - **External research.** Allowing the model to consult external AV forums was
-  proposed in earlier discussion but is *not* accepted as a required v2
+  proposed in earlier discussion but is _not_ accepted as a required v2
   capability: it raises freshness, provenance, prompt-injection, latency,
   cost, and availability questions. It is deferred from the first v2 slice
   as a follow-on decision; the evidence path assumes no unrestricted web

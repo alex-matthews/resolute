@@ -50,7 +50,9 @@ def _print_decision(decision: Decision, as_json: bool) -> None:
     typer.echo(f"decision : {decision.decision_id}")
     typer.echo(f"title    : {decision.title} ({decision.year})")
     typer.echo(f"final    : {decision.final_resolution}  confidence={decision.confidence}")
-    typer.echo(f"objective: {decision.objective.resolution}  household: {decision.household.resolution}")
+    typer.echo(
+        f"objective: {decision.objective.resolution}  household: {decision.household.resolution}"
+    )
     typer.echo(f"mode     : {decision.mode}")
     if decision.score:  # v1 records only; v2 decisions carry no score
         typer.echo(f"score    : {decision.score} (v1 deterministic record)")
@@ -102,9 +104,7 @@ def plan_seerr(
 ) -> None:
     """Reconstruct a Seerr request and produce its decision/action plan (no writes)."""
     _, _, engine, store = _build(config, None)
-    request = DecisionRequest(
-        seerr_request_id=seerr_request_id, trigger=TriggerSource.MANUAL_CLI
-    )
+    request = DecisionRequest(seerr_request_id=seerr_request_id, trigger=TriggerSource.MANUAL_CLI)
     decision = engine.decide(request, None)
     store.save_decision(decision)
     _print_decision(decision, as_json)
@@ -169,9 +169,7 @@ def execute(
     _print_decision(decision, False)
     writes = [a for a in decision.action_plan if a.is_write]
     if writes and not yes:
-        typer.confirm(
-            f"Execute {len(writes)} write action(s) as {operator}?", abort=True
-        )
+        typer.confirm(f"Execute {len(writes)} write action(s) as {operator}?", abort=True)
     try:
         executed = rt.executor.execute(decision, operator_approved=True)
     except ExecutionBlocked as exc:
@@ -194,8 +192,12 @@ def execute(
 def downgrade(
     tvdb_id: int = typer.Option(..., "--tvdb-id"),
     costanza_decision_id: str = typer.Option(..., "--costanza-decision-id"),
-    target_profile: str | None = typer.Option(None, help="Defaults to downgrade.target_profile_name"),
-    execute: bool = typer.Option(False, "--execute", help="Apply the reclaim (default: report only)"),
+    target_profile: str | None = typer.Option(
+        None, help="Defaults to downgrade.target_profile_name"
+    ),
+    execute: bool = typer.Option(
+        False, "--execute", help="Apply the reclaim (default: report only)"
+    ),
     operator: str | None = typer.Option(None, help="Required with --execute"),
     config: str | None = _config_option,
 ) -> None:
@@ -521,9 +523,7 @@ def eval_models(
     # the rootfs is read-only and only /data and /tmp are writable, so a
     # CWD-relative default would spend the model budget and then fail to save.
     stamp = doc["generated_at"].replace(":", "").replace("+0000", "Z")
-    out_path = Path(
-        report or Path(settings.db_path).parent / "eval-reports" / f"eval-{stamp}.json"
-    )
+    out_path = Path(report or Path(settings.db_path).parent / "eval-reports" / f"eval-{stamp}.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(doc, indent=2) + "\n")
 
@@ -543,9 +543,7 @@ def eval_models(
 @app.command("fixtures-test")
 def fixtures_test(
     fixtures: str = typer.Option("fixtures/evidence", "--fixtures"),
-    golden: str = typer.Option(
-        "fixtures/golden/expectations.json", "--cases", "--golden"
-    ),
+    golden: str = typer.Option("fixtures/golden/expectations.json", "--cases", "--golden"),
     config: str | None = _config_option,
 ) -> None:
     """Run golden expectations against fixture evidence. Exit 1 on any mismatch.
@@ -563,16 +561,13 @@ def fixtures_test(
     for case in cases:
         canned = case.get("verdict")
         judge = Judge(StaticProvider([json.dumps(canned)])) if canned else None
-        engine = DecisionEngine(
-            settings, household, FixtureEvidenceSource(fixtures), judge=judge
-        )
+        engine = DecisionEngine(settings, household, FixtureEvidenceSource(fixtures), judge=judge)
         request = DecisionRequest(**case["request"])
         decision = engine.decide(request, AutomationMode.SHADOW)
         expected = Resolution(case["expected_resolution"])
         expect_hold = bool(case.get("expect_hold", False))
         held = any(
-            "hold" in a.type or a.type == "insufficient_metadata"
-            for a in decision.action_plan
+            "hold" in a.type or a.type == "insufficient_metadata" for a in decision.action_plan
         )
         ok = decision.final_resolution is expected and held == expect_hold
         detail = ""

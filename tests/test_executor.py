@@ -65,9 +65,7 @@ def seerr_decision(settings, policy, evidence_source):
         engine = DecisionEngine(
             engine_settings, policy, RequestEvidenceSource(), judge=canned_judge()
         )
-        return engine.decide(
-            DecisionRequest(title="Severance", tmdb_id=95396, seasons=[1]), mode
-        )
+        return engine.decide(DecisionRequest(title="Severance", tmdb_id=95396, seasons=[1]), mode)
 
     return make
 
@@ -156,9 +154,7 @@ class ApprovalRaceSeerr(FakeSeerr):
 
 
 def test_mid_plan_failure_reports_partial_execution(seerr_decision):
-    executor, _ = _executor(
-        AutomationMode.APPROVE, allow_writes=True, seerr=FailingApproveSeerr()
-    )
+    executor, _ = _executor(AutomationMode.APPROVE, allow_writes=True, seerr=FailingApproveSeerr())
     decision = seerr_decision(AutomationMode.APPROVE)
     with pytest.raises(ExecutionFailed) as info:
         executor.execute(decision, operator_approved=True)
@@ -169,9 +165,7 @@ def test_mid_plan_failure_reports_partial_execution(seerr_decision):
 
 
 def test_approval_race_after_profile_update_reports_partial(seerr_decision):
-    executor, _ = _executor(
-        AutomationMode.APPROVE, allow_writes=True, seerr=ApprovalRaceSeerr()
-    )
+    executor, _ = _executor(AutomationMode.APPROVE, allow_writes=True, seerr=ApprovalRaceSeerr())
     decision = seerr_decision(AutomationMode.APPROVE)
     with pytest.raises(ExecutionFailed) as info:
         executor.execute(decision, operator_approved=True)
@@ -181,9 +175,7 @@ def test_approval_race_after_profile_update_reports_partial(seerr_decision):
 
 def test_request_no_longer_pending_is_blocked(seerr_decision):
     # A human approved the request in Seerr between decision and execution.
-    executor, _ = _executor(
-        AutomationMode.APPROVE, allow_writes=True, seerr=FakeSeerr(status=2)
-    )
+    executor, _ = _executor(AutomationMode.APPROVE, allow_writes=True, seerr=FakeSeerr(status=2))
     decision = seerr_decision(AutomationMode.APPROVE)
     with pytest.raises(ExecutionBlocked, match="not pending"):
         executor.execute(decision, operator_approved=True)

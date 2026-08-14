@@ -11,9 +11,7 @@ from resolute.judge.provider import OpenAICompatProvider, ProviderError
 
 
 def _provider(handler) -> OpenAICompatProvider:
-    client = httpx.Client(
-        base_url="http://litellm.test/v1", transport=httpx.MockTransport(handler)
-    )
+    client = httpx.Client(base_url="http://litellm.test/v1", transport=httpx.MockTransport(handler))
     return OpenAICompatProvider(
         base_url="http://litellm.test/v1", api_key="k", model="test-model", client=client
     )
@@ -92,7 +90,9 @@ def test_default_client_sends_auth_header_and_timeout():
     """Production client construction, not an injected one: auth header,
     base_url, and timeout must come from the constructor args."""
     provider = OpenAICompatProvider(
-        base_url="http://litellm.test/v1", api_key="sekrit-key", model="m",
+        base_url="http://litellm.test/v1",
+        api_key="sekrit-key",
+        model="m",
         timeout_seconds=7.5,
     )
     client = provider._client

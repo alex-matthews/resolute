@@ -103,9 +103,7 @@ def _attempts_dump(involvement) -> list[dict]:
     return [a.model_dump(mode="json") for a in involvement.attempts]
 
 
-def _run_once(
-    case: dict, judge: Judge, settings: Settings, household: HouseholdPolicy
-) -> Run:
+def _run_once(case: dict, judge: Judge, settings: Settings, household: HouseholdPolicy) -> Run:
     if case.get("kind") == "objective":
         facts = ShowFacts(**case["facts"])
         verdict, involvement = judge.judge_objective(facts)
@@ -184,9 +182,7 @@ def evaluate_cases(
                 result.schema_failures += 1
             result.runs.append(run)
 
-        ok_runs = [
-            _acceptable(case, r) for r in result.runs if r.resolution != "schema_failure"
-        ]
+        ok_runs = [_acceptable(case, r) for r in result.runs if r.resolution != "schema_failure"]
         result.passed = result.schema_failures == 0 and bool(ok_runs) and all(ok_runs)
         if case.get("require_stable") and len(set(result.outcomes)) > 1:
             result.passed = False
@@ -197,9 +193,7 @@ def evaluate_cases(
     return results
 
 
-def check_invariants(
-    results: list[CaseResult], invariants: list[dict]
-) -> list[InvariantResult]:
+def check_invariants(results: list[CaseResult], invariants: list[dict]) -> list[InvariantResult]:
     by_name = {r.name: r for r in results}
     out: list[InvariantResult] = []
     for inv in invariants:
@@ -215,9 +209,7 @@ def check_invariants(
             # Effects cannot be attributed to the varied input when an
             # operand's own outcome wanders across repeats.
             out.append(
-                InvariantResult(
-                    description, False, f"unstable operand(s) {unstable}: {detail}"
-                )
+                InvariantResult(description, False, f"unstable operand(s) {unstable}: {detail}")
             )
             continue
         if kind == "different_outcomes":
@@ -332,8 +324,6 @@ def build_report(
             "invariants_total": len(invariant_results),
             "schema_failures": sum(r.schema_failures for r in results),
             "total_latency_ms": sum(run.latency_ms for r in results for run in r.runs),
-            "total_tokens": sum(
-                run.tokens_in + run.tokens_out for r in results for run in r.runs
-            ),
+            "total_tokens": sum(run.tokens_in + run.tokens_out for r in results for run in r.runs),
         },
     }

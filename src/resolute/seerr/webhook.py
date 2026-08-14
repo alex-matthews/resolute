@@ -81,9 +81,7 @@ def _parse_seasons(extra: list[WebhookExtra]) -> list[int]:
     return []
 
 
-def normalize_webhook(
-    payload: dict, trigger_notification_types: list[str]
-) -> DecisionRequest:
+def normalize_webhook(payload: dict, trigger_notification_types: list[str]) -> DecisionRequest:
     """Validate and convert a Seerr webhook payload into the canonical request.
 
     Raises WebhookRejection for payloads that should be acknowledged and skipped

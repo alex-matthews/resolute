@@ -85,32 +85,32 @@ Settings -> Notifications -> Webhook in Seerr:
 
 ```json
 {
-    "notification_type": "{{notification_type}}",
-    "event": "{{event}}",
-    "subject": "{{subject}}",
-    "message": "{{message}}",
-    "{{media}}": "media",
-    "{{request}}": "request",
-    "{{extra}}": []
+  "notification_type": "{{notification_type}}",
+  "event": "{{event}}",
+  "subject": "{{subject}}",
+  "message": "{{message}}",
+  "{{media}}": "media",
+  "{{request}}": "request",
+  "{{extra}}": []
 }
 ```
 
 Movies, non-trigger events, and test notifications are acknowledged and
 skipped; every payload is stored for fixture harvesting.
 
-**Prerequisite**: TV requests must land *pending* (disable Seerr TV
+**Prerequisite**: TV requests must land _pending_ (disable Seerr TV
 auto-approval for in-scope users), otherwise resolute can only audit after
 the fact.
 
 ## Automation modes
 
-| Mode | Writes | Behavior |
-| --- | --- | --- |
-| `shadow` (default) | none | decide, log, compare against current state |
-| `recommend` | none | decide and return/publish the action plan |
-| `approve` | on explicit command | `POST /api/decisions/{id}/execute` runs the plan |
-| `auto_profile` | automatic | sets the pending request's profile; approval stays human |
-| `auto_approve` | automatic | also approves; requires `auto_approve_enabled: true` |
+| Mode               | Writes              | Behavior                                                 |
+| ------------------ | ------------------- | -------------------------------------------------------- |
+| `shadow` (default) | none                | decide, log, compare against current state               |
+| `recommend`        | none                | decide and return/publish the action plan                |
+| `approve`          | on explicit command | `POST /api/decisions/{id}/execute` runs the plan         |
+| `auto_profile`     | automatic           | sets the pending request's profile; approval stays human |
+| `auto_approve`     | automatic           | also approves; requires `auto_approve_enabled: true`     |
 
 All writes additionally require the `allow_writes: true` master switch, and
 held/low-confidence decisions never execute regardless of mode. The auto

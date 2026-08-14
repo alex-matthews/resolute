@@ -124,9 +124,10 @@ Guidance:
 - Point Seerr at a Chaski route; have Chaski relay the **unmodified** JSON
   body to resolute and inject the `X-Resolute-Token` header at the relay if you
   prefer keeping the secret out of Seerr.
-- Optionally gate with CEL (`payload.notification_type == "MEDIA_PENDING" &&
-  payload.media.media_type == "tv"`) to cut noise; resolute performs the
-  same filtering itself, so this is an optimization, not a requirement.
+- Optionally gate with CEL by requiring
+  `payload.notification_type == "MEDIA_PENDING"` and
+  `payload.media.media_type == "tv"` to cut noise; resolute performs the same
+  filtering itself, so this is an optimization, not a requirement.
 - Do **not** use Chaski as a queue, state store, or decision layer. resolute
   must keep working when Chaski is removed — the direct shape above is the
   supported baseline, and nothing in resolute knows Chaski exists.
@@ -187,7 +188,7 @@ spec:
               app.kubernetes.io/name: seerr
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: resolute   # review cronjob
+              app.kubernetes.io/name: resolute # review cronjob
       ports:
         - port: 8080
 ```
@@ -203,7 +204,7 @@ uvicorn worker** (`resolute serve` runs one worker; the HelmRelease pins
 that writes (`decide`, `feedback`, execution). `kubectl exec` CLI use is a
 second Python process with its own SQLite connection against the same
 pod/PVC — outside the in-process lock, but WAL makes it acceptable for
-break-glass use at this volume. Never write from a *different* pod or node.
+break-glass use at this volume. Never write from a _different_ pod or node.
 If this service ever genuinely needs concurrency, that is the Postgres
 trigger mentioned in the design docs.
 

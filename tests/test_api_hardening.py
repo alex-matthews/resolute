@@ -22,9 +22,7 @@ def test_webhook_invalid_json_is_stored_and_400(settings, policy, evidence_sourc
     )
     assert response.status_code == 400
     # the garbage payload still lands in the webhook_events fixture farm
-    row = store._conn.execute(
-        "SELECT outcome, payload FROM webhook_events"
-    ).fetchone()
+    row = store._conn.execute("SELECT outcome, payload FROM webhook_events").fetchone()
     assert row[0] == "invalid: not json"
     assert "this is not json" in row[1]
 

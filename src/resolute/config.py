@@ -161,9 +161,7 @@ def load_settings(config_file: str | os.PathLike[str] | None = None) -> Settings
     return Settings(**file_values)
 
 
-def load_household_policy(
-    path: str | os.PathLike[str], required: bool = False
-) -> HouseholdPolicy:
+def load_household_policy(path: str | os.PathLike[str], required: bool = False) -> HouseholdPolicy:
     """Load the household preference prose (ADR-0003).
 
     `required=True` is the production serve path: the image deliberately

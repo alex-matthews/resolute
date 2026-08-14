@@ -1,14 +1,10 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-name: Scan
+name: Scheduled Scan
 
-# Policy (revised per PR #57 round-5 review): PRs build and scan the EXACT
-# image they would publish, and FAIL on fixable HIGH/CRITICAL findings
-# (ignore-unfixed handles the no-upstream-fix churn that once justified
-# report-only — an unfixable base-image CVE never blocks a PR, a fixable one
-# always does). The weekly scan of the published image stays report-only
-# SARIF for drift monitoring; Renovate remains the remediation path for base
-# digest and lockfile bumps.
+# PR filesystem/image scanning lives in ci.yaml and participates in its required
+# Build Success fan-in. This workflow is the report-only weekly drift monitor;
+# Renovate remains the remediation path for base digest and lockfile bumps.
 #
 # Personal-account note: SARIF upload requires GitHub code scanning, which is
 # free on public repos but unavailable on private personal repos (GHAS is
@@ -16,9 +12,6 @@ name: Scan
 # `format: table` + `exit-code: "0"` console output.
 
 on:
-  pull_request:
-    branches:
-      - main
   schedule:
     - cron: 0 5 * * 1
   workflow_dispatch:
@@ -59,32 +52,8 @@ jobs:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
 
-  pr-image:
-    name: Trivy PR Image Scan (enforced)
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Build the PR image
-        run: docker build -t resolute:pr-scan .
-
-      - name: Trivy gate — fixable HIGH/CRITICAL fail the PR
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: image
-          image-ref: resolute:pr-scan
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          format: table
-          exit-code: "1"
-
   image:
     name: Trivy Image Scan
-    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read

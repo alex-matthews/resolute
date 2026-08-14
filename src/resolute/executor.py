@@ -72,9 +72,7 @@ class Executor:
         if action.type in _SEERR_PROFILE_ACTIONS:
             return True
         if action.type is ActionType.APPROVE_SEERR_REQUEST:
-            return (
-                mode is AutomationMode.AUTO_APPROVE and self.settings.auto_approve_enabled
-            )
+            return mode is AutomationMode.AUTO_APPROVE and self.settings.auto_approve_enabled
         if action.type in _SONARR_FALLBACK_ACTIONS:
             return operator_approved  # fallback is never automatic in v1
         return False

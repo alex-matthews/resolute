@@ -30,7 +30,10 @@ UHD_PROFILE = {
             "name": "WEB 2160p",
             "allowed": True,
             "items": [
-                {"quality": {"id": 18, "name": "WEBRip-2160p", "resolution": 2160}, "allowed": True},
+                {
+                    "quality": {"id": 18, "name": "WEBRip-2160p", "resolution": 2160},
+                    "allowed": True,
+                },
             ],
         },
     ],
@@ -48,10 +51,14 @@ class FakeDowngradeSonarr:
     ):
         self.series = dict(series) if series else None
         self.queue = queue or []
-        self.files = files if files is not None else [
-            {"id": 1, "size": 30 * 1024**3, "quality": {"quality": {"resolution": 2160}}},
-            {"id": 2, "size": 4 * 1024**3, "quality": {"quality": {"resolution": 1080}}},
-        ]
+        self.files = (
+            files
+            if files is not None
+            else [
+                {"id": 1, "size": 30 * 1024**3, "quality": {"quality": {"resolution": 2160}}},
+                {"id": 2, "size": 4 * 1024**3, "quality": {"quality": {"resolution": 1080}}},
+            ]
+        )
         self.fail_profile_writes = fail_profile_writes
         self.fail_search_triggers = fail_search_triggers
         self.profile_updates: list[tuple] = []
@@ -126,9 +133,10 @@ def test_clean_plan_reports_reclaim(dg_settings):
 
 def test_plan_blockers(dg_settings):
     sonarr = FakeDowngradeSonarr(series=SERIES)
-    assert "Costanza protection" in plan_downgrade(
-        handoff(protected=True), dg_settings, sonarr
-    ).blockers[0]
+    assert (
+        "Costanza protection"
+        in plan_downgrade(handoff(protected=True), dg_settings, sonarr).blockers[0]
+    )
 
     stale = handoff(decided_at=datetime.now(UTC) - timedelta(days=30))
     assert any("stale" in b for b in plan_downgrade(stale, dg_settings, sonarr).blockers)
@@ -276,9 +284,7 @@ def test_reconcile_downgrade_outcomes(dg_settings, store):
 
     # Sonarr's upgrade flow replaced the file: reclaim complete
     sonarr.queue = []
-    sonarr.files = [
-        {"id": 3, "size": 4 * 1024**3, "quality": {"quality": {"resolution": 1080}}}
-    ]
+    sonarr.files = [{"id": 3, "size": 4 * 1024**3, "quality": {"quality": {"resolution": 1080}}}]
     result = reconcile_downgrade(plan, sonarr)
     assert result["outcome"] == "complete"
     assert result["gb_freed_so_far"] == 30.0

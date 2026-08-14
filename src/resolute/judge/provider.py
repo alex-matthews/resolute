@@ -79,13 +79,10 @@ class OpenAICompatProvider:
             else None
         )
         if not isinstance(content, str):
-            raise ProviderError(
-                f"model returned non-string content ({type(content).__name__})"
-            )
+            raise ProviderError(f"model returned non-string content ({type(content).__name__})")
         if len(content) > self._MAX_RESPONSE_CHARS:
             raise ProviderError(
-                f"model response exceeds {self._MAX_RESPONSE_CHARS} chars"
-                f" ({len(content)})"
+                f"model response exceeds {self._MAX_RESPONSE_CHARS} chars ({len(content)})"
             )
         return content
 

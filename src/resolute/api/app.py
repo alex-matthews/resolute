@@ -146,7 +146,7 @@ def create_app(
     def _decide_and_store(request: DecisionRequest, mode: AutomationMode | None) -> Decision:
         decision = engine.decide(request, mode)
         store.save_decision(decision)
-        metrics[f"decisions_total{{resolution=\"{decision.final_resolution}\"}}"] += 1
+        metrics[f'decisions_total{{resolution="{decision.final_resolution}"}}'] += 1
         _record_model_metrics(decision.model_involvement, decision.verdict is None)
         return decision
 
@@ -242,9 +242,7 @@ def create_app(
             raise HTTPException(422, "webhook body must be a JSON object")
 
         try:
-            decision_request = normalize_webhook(
-                payload, settings.seerr.trigger_notification_types
-            )
+            decision_request = normalize_webhook(payload, settings.seerr.trigger_notification_types)
         except WebhookRejection as exc:
             store.save_webhook_event(payload, outcome=f"skipped: {exc}")
             metrics["webhook_skipped_total"] += 1
@@ -260,9 +258,9 @@ def create_app(
 
         executed: list[str] = []
         execution_error: str | None = None
-        if (
-            executor is not None
-            and settings.mode in (AutomationMode.AUTO_PROFILE, AutomationMode.AUTO_APPROVE)
+        if executor is not None and settings.mode in (
+            AutomationMode.AUTO_PROFILE,
+            AutomationMode.AUTO_APPROVE,
         ):
             try:
                 executed = [a.value for a in executor.execute(decision)]
