@@ -1,0 +1,20 @@
+[[remotes]]
+git_url = "https://github.com/home-operations/.github"
+ref = "main"
+configs = ["lefthook.common.toml"]
+
+# Ruff is the Python formatter; the shared hook covers Go and Rust but has no
+# Python command because most fleet projects use one of those languages.
+[pre-commit.commands.format-python]
+glob = ["*.py"]
+run = "uv run ruff format {staged_files}"
+stage_fixed = true
+
+# Keep generated release state out of oxfmt and out of the inherited command's
+# target list. If it were only .prettierignore'd, a commit staging just this file
+# would hand oxfmt an all-ignored list and fail with no target files.
+[pre-commit.commands.format-json]
+glob = ["*.json", "*.json5", "*.jsonc"]
+run = "oxfmt {staged_files}"
+stage_fixed = true
+exclude = [".release-please-manifest.json"]

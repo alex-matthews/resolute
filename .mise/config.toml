@@ -1,13 +1,19 @@
 [tools]
-python = "3.14.7"
-uv = "0.12.3"
+actionlint = "1.7.12"
+hadolint = "2.15.1"
 helm = "4.2.3"
 kubeconform = "0.8.0"
-hadolint = "2.15.1"
-actionlint = "1.7.12"
+lefthook = "2.1.10"
+node = "24.19.0"
+oxfmt = "0.63.0"
+python = "3.14.7"
 shellcheck = "0.11.0"
+uv = "0.12.3"
 zizmor = "1.29.0"
 yq = "4.53.3"
+
+[hooks]
+postinstall = "lefthook install"
 
 [tasks.sync]
 description = "Install locked dependencies (incl. dev group)"
@@ -24,6 +30,22 @@ run = "uv run ruff check src tests"
 [tasks.lint-fix]
 description = "Run ruff with --fix"
 run = "uv run ruff check --fix src tests"
+
+[tasks.python-format]
+description = "Format Python source and tests"
+run = "uv run ruff format src tests"
+
+[tasks.python-format-check]
+description = "Verify Python formatting without changing files"
+run = "uv run ruff format --check src tests"
+
+[tasks.markdown-format]
+description = "Format authored Markdown files"
+run = "oxfmt --no-error-on-unmatched-pattern '**/*.md' '**/*.markdown' '**/*.mdx'"
+
+[tasks.markdown-format-check]
+description = "Verify authored Markdown formatting without changing files"
+run = "oxfmt --check --no-error-on-unmatched-pattern '**/*.md' '**/*.markdown' '**/*.mdx'"
 
 [tasks.golden]
 description = "Run the canned-verdict pipeline fixtures (rails/planner regressions, not a taste oracle)"
@@ -66,7 +88,17 @@ run = "docker build -t resolute:local ."
 
 [tasks.ci]
 description = "Core CI checks, locally (excludes the container build: run `mise run build` separately, it needs a Docker daemon)"
-depends = ["lint", "test", "golden", "dockerfile-lint", "shell-lint", "workflow-lint", "kubeconform"]
+depends = [
+  "lint",
+  "python-format-check",
+  "markdown-format-check",
+  "test",
+  "golden",
+  "dockerfile-lint",
+  "shell-lint",
+  "workflow-lint",
+  "kubeconform",
+]
 
 [tasks.eval]
 description = "Model-eval suite against the CONFIGURED LIVE model (spends provider money; never part of ci). See docs/testing.md."
