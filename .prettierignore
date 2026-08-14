@@ -1,6 +1,9 @@
 *.toml
 .release-please-manifest.json
 
+# Generated and maintained by release-please.
+CHANGELOG.md
+
 # Eval reports hash this corpus as raw bytes. Normalize only as an explicit,
 # documented provenance boundary.
 fixtures/eval/cases.json

@@ -10,6 +10,15 @@ glob = ["*.py"]
 run = "uv run ruff format {staged_files}"
 stage_fixed = true
 
+# release-please owns CHANGELOG.md and does not emit oxfmt's layout. Exclude it
+# before constructing {staged_files}; relying only on .prettierignore would make
+# a changelog-only release commit fail because oxfmt receives no usable target.
+[pre-commit.commands.format-markdown]
+glob = ["*.md", "*.markdown", "*.mdx"]
+run = "oxfmt {staged_files}"
+stage_fixed = true
+exclude = ["CHANGELOG.md"]
+
 # Keep deliberately unnormalized JSON out of oxfmt and out of the inherited
 # command's target list. If these were only .prettierignore'd, a commit staging
 # just ignored files would hand oxfmt an empty list and fail with no targets.
