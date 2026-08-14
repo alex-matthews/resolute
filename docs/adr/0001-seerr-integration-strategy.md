@@ -58,7 +58,7 @@ which Sonarr can start searching with the wrong profile. Consequences:
    as triggers, but the planner only emits Seerr write actions for requests
    whose fetched status is `pending` — non-pending requests can only produce
    audit/fallback plans since they have already routed.
-2. The executor sets the profile *before* approving, in plan order, and
+2. The executor sets the profile _before_ approving, in plan order, and
    re-verifies pending status at execution time (both before the profile
    update and before approval), so a human approving in Seerr between
    decision and execution blocks the write instead of racing it.

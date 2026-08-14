@@ -125,9 +125,7 @@ def shadow_delta(
     profile_name_2160p: str,
 ) -> str | None:
     """Human-readable comparison of the recommendation vs observed current state."""
-    expected = (
-        profile_name_2160p if result.resolution is Resolution.P2160 else profile_name_1080p
-    )
+    expected = profile_name_2160p if result.resolution is Resolution.P2160 else profile_name_1080p
     if evidence.sonarr.exists and evidence.sonarr.quality_profile_name:
         current = evidence.sonarr.quality_profile_name
         if current.strip().lower() == expected.strip().lower():

@@ -37,9 +37,7 @@ def test_pending_request_gets_profile_then_approval_plan():
 
 
 def test_1080p_decision_uses_1080p_profile_action():
-    actions = build_action_plan(
-        _result(Resolution.P1080), _evidence_with_request(), **PROFILES
-    )
+    actions = build_action_plan(_result(Resolution.P1080), _evidence_with_request(), **PROFILES)
     assert actions[0].type is ActionType.SET_SEERR_REQUEST_PROFILE_1080P
     assert actions[0].params["profile_name"] == "HD-1080p"
 

@@ -28,9 +28,7 @@ def test_last_and_list(engine, store):
 def test_feedback_and_calibration_summary(engine, store):
     decision = _decision(engine)
     store.save_decision(decision)
-    store.save_feedback(
-        FeedbackIn(decision_id=decision.decision_id, verdict=FeedbackVerdict.AGREE)
-    )
+    store.save_feedback(FeedbackIn(decision_id=decision.decision_id, verdict=FeedbackVerdict.AGREE))
     store.save_feedback(
         FeedbackIn(
             decision_id=decision.decision_id,

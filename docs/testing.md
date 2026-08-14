@@ -8,8 +8,8 @@ distinct layers, each answering a different question.
 
 Schemas, rails, planner, executor, store, API, CLI, webhook normalizer, and
 the fallback matrix — everything with an exact right answer. Model behavior is
-supplied as canned verdicts, so these tests prove: *whatever the model says,
-the system stays inside the safety envelope*. They prove nothing about
+supplied as canned verdicts, so these tests prove: _whatever the model says,
+the system stays inside the safety envelope_. They prove nothing about
 decision quality.
 
 The `fixtures-test` cases (`fixtures/golden/expectations.json`) belong to this
@@ -36,7 +36,7 @@ shadow is the calibration method, and real household requests are the real
 corpus). Labeled cases (`fixtures/eval/cases.json`) run against a live
 provider, spending real money, scored against
 
-- acceptable resolution *sets* (never exact prose),
+- acceptable resolution _sets_ (never exact prose),
 - hold expectations (with held-alternative acceptance),
 - repeat-run stability (`--repeat`, default 3),
 - schema-failure rate (any failure fails the case),
@@ -86,9 +86,9 @@ and `model_tokens_total{direction}`.
 
 ## What gates what
 
-| Gate | Evidence required |
-| --- | --- |
-| Merging code | Layers 1–2 green in CI (the deploy template ships the model OFF and the CronJob suspended) |
-| Enabling the model in shadow | A reviewed Git commit (rollout.md phase 0.5) with a LiteLLM budget in place; layer 3 is optional pre-flight |
-| Leaving shadow (approve mode) | Layer 4: rollout.md phase-1 exit criteria |
-| Auto modes | Layer 4 sustained (rollout.md phases 3–4) |
+| Gate                          | Evidence required                                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Merging code                  | Layers 1–2 green in CI (the deploy template ships the model OFF and the CronJob suspended)                  |
+| Enabling the model in shadow  | A reviewed Git commit (rollout.md phase 0.5) with a LiteLLM budget in place; layer 3 is optional pre-flight |
+| Leaving shadow (approve mode) | Layer 4: rollout.md phase-1 exit criteria                                                                   |
+| Auto modes                    | Layer 4 sustained (rollout.md phases 3–4)                                                                   |

@@ -34,20 +34,20 @@ safety envelope.
 
 ## Modules
 
-| Module | Responsibility |
-| --- | --- |
-| `schemas/` | Pydantic contracts: request, evidence, decision, action plan, feedback, model verdicts. Everything is `extra="forbid"`. |
-| `config.py` | Runtime settings (env `RESOLUTE_*` / YAML) and the household-preference prose (sensitive runtime config, Secret-mounted). |
-| `metadata/source.py` | EvidenceSource protocol: live (Seerr + Sonarr, incl. `/diskspace`) and fixture implementations. |
-| `engine/rails.py` | The ADR-0003 safety envelope: metadata floor, conservative fallback, hold handling. |
-| `engine/engine.py` | Orchestrator: evidence → floor → model → rails → plan → Decision. |
-| `judge/` | Provider abstraction, versioned prompts, strict validation with one retry. Two invocation contracts: request-path and objective-only. |
-| `seerr/` | API client, canonical webhook template + normalizer, action planner. |
-| `sonarr/` | API client, post-hoc profile audit, fallback correction. |
-| `sonarr/downgrade.py` | ADR-0002 reclaim-to-1080p executor: report-only default, admin-confirm gated, write-ahead audited, exactly-once per Costanza decision. |
-| `store/db.py` | SQLite (WAL) decisions/feedback/audits/webhook events/executions + JSONL export. |
-| `executor.py` | The only write path; enforces the mode/write matrix. |
-| `api/app.py`, `cli.py` | Thin adapters over the same engine. |
+| Module                 | Responsibility                                                                                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemas/`             | Pydantic contracts: request, evidence, decision, action plan, feedback, model verdicts. Everything is `extra="forbid"`.                |
+| `config.py`            | Runtime settings (env `RESOLUTE_*` / YAML) and the household-preference prose (sensitive runtime config, Secret-mounted).              |
+| `metadata/source.py`   | EvidenceSource protocol: live (Seerr + Sonarr, incl. `/diskspace`) and fixture implementations.                                        |
+| `engine/rails.py`      | The ADR-0003 safety envelope: metadata floor, conservative fallback, hold handling.                                                    |
+| `engine/engine.py`     | Orchestrator: evidence → floor → model → rails → plan → Decision.                                                                      |
+| `judge/`               | Provider abstraction, versioned prompts, strict validation with one retry. Two invocation contracts: request-path and objective-only.  |
+| `seerr/`               | API client, canonical webhook template + normalizer, action planner.                                                                   |
+| `sonarr/`              | API client, post-hoc profile audit, fallback correction.                                                                               |
+| `sonarr/downgrade.py`  | ADR-0002 reclaim-to-1080p executor: report-only default, admin-confirm gated, write-ahead audited, exactly-once per Costanza decision. |
+| `store/db.py`          | SQLite (WAL) decisions/feedback/audits/webhook events/executions + JSONL export.                                                       |
+| `executor.py`          | The only write path; enforces the mode/write matrix.                                                                                   |
+| `api/app.py`, `cli.py` | Thin adapters over the same engine.                                                                                                    |
 
 ## The hard rails (ADR-0003)
 

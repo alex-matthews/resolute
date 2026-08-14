@@ -182,9 +182,7 @@ def test_execute_endpoint_requires_operator_token(api):
     ).json()["decision_id"]
     # no token header
     assert (
-        client.post(
-            f"/api/decisions/{decision_id}/execute", json={"operator": "alex"}
-        ).status_code
+        client.post(f"/api/decisions/{decision_id}/execute", json={"operator": "alex"}).status_code
         == 403
     )
     # wrong token
@@ -247,9 +245,7 @@ def test_reviews_pending_endpoint(settings, policy, evidence_source, store):
     from conftest import canned_judge
 
     engine = DecisionEngine(settings, policy, evidence_source, judge=canned_judge())
-    client = TestClient(
-        create_app(settings, policy, engine, store, None, seerr=FakeSeerrList())
-    )
+    client = TestClient(create_app(settings, policy, engine, store, None, seerr=FakeSeerrList()))
     body = client.post("/api/reviews/pending").json()
     assert body["reviewed"] == 1  # the movie was skipped
     assert body["decisions"][0]["final_resolution"] == "2160p"
@@ -286,9 +282,7 @@ def test_api_token_gates_decision_endpoints(settings, policy, evidence_source, s
     assert metrics_client.get("/metrics").status_code == 200
 
 
-def test_webhook_exempt_from_api_token(
-    settings, policy, evidence_source, store, webhook_payload
-):
+def test_webhook_exempt_from_api_token(settings, policy, evidence_source, store, webhook_payload):
     settings.api_token = "api-tok"
     settings.seerr.webhook_shared_secret = "hook-secret"
     engine = DecisionEngine(settings, policy, evidence_source)
@@ -313,9 +307,7 @@ def test_partial_execution_is_recorded_durably(
     executor = Executor(settings, seerr=FailingApproveSeerr(), sonarr=FakeSonarr())
     client = TestClient(create_app(settings, policy, engine, store, executor))
 
-    decision_id = client.post("/api/webhooks/seerr", json=webhook_payload).json()[
-        "decision_id"
-    ]
+    decision_id = client.post("/api/webhooks/seerr", json=webhook_payload).json()["decision_id"]
     response = client.post(
         f"/api/decisions/{decision_id}/execute",
         json={"operator": "alex"},
@@ -336,9 +328,7 @@ def test_webhook_auto_execution_records_partial_and_reports_error(
     from conftest import canned_judge
     from test_executor import FailingApproveSeerr
 
-    settings = _auto_settings(
-        tmp_path, AutomationMode.AUTO_APPROVE, auto_approve_enabled=True
-    )
+    settings = _auto_settings(tmp_path, AutomationMode.AUTO_APPROVE, auto_approve_enabled=True)
     engine = DecisionEngine(settings, policy, evidence_source, judge=canned_judge())
     executor = Executor(settings, seerr=FailingApproveSeerr(), sonarr=FakeSonarr())
     client = TestClient(create_app(settings, policy, engine, store, executor))
@@ -453,14 +443,10 @@ def _worth_client(settings, policy, evidence_source, store, judge="valid"):
 
 
 def _audit_rows(store):
-    return store._conn.execute(
-        "SELECT payload FROM audits WHERE tvdb_id = 371980"
-    ).fetchall()
+    return store._conn.execute("SELECT payload FROM audits WHERE tvdb_id = 371980").fetchall()
 
 
-def test_objective_worth_via_sonarr_title_and_search(
-    settings, policy, evidence_source, store
-):
+def test_objective_worth_via_sonarr_title_and_search(settings, policy, evidence_source, store):
     client = _worth_client(settings, policy, evidence_source, store)
     body = client.get("/api/titles/371980/objective-worth").json()
     assert body["worth"] == "2160p"
@@ -603,9 +589,7 @@ def test_objective_worth_audits_even_on_provider_explosion(
         def complete_json(self, system, user):
             raise RuntimeError("socket weirdness")
 
-    engine = DecisionEngine(
-        settings, policy, evidence_source, judge=Judge(ExplodingProvider())
-    )
+    engine = DecisionEngine(settings, policy, evidence_source, judge=Judge(ExplodingProvider()))
     client = TestClient(
         create_app(settings, policy, engine, store, None, seerr=WorthSeerr(), sonarr=WorthSonarr())
     )
@@ -655,9 +639,7 @@ def test_stored_v1_decision_round_trips(store):
     from resolute.metadata.source import FixtureEvidenceSource
 
     settings = Settings(db_path=":memory:")
-    engine = DecisionEngine(
-        settings, HouseholdPolicy(), FixtureEvidenceSource("fixtures/evidence")
-    )
+    engine = DecisionEngine(settings, HouseholdPolicy(), FixtureEvidenceSource("fixtures/evidence"))
     client = TestClient(create_app(settings, HouseholdPolicy(), engine, store, None))
     got = client.get(f"/api/decisions/{decision.decision_id}")
     assert got.status_code == 200
@@ -667,9 +649,7 @@ def test_stored_v1_decision_round_trips(store):
     assert listed[0]["decision_id"] == decision.decision_id
 
 
-def test_model_metrics_count_attempts_not_inferences(
-    settings, policy, evidence_source, store
-):
+def test_model_metrics_count_attempts_not_inferences(settings, policy, evidence_source, store):
     """Round-4 review: a retried inference is two billable provider calls and
     must be metered as such, labeled by model."""
     from conftest import make_verdict
@@ -682,8 +662,7 @@ def test_model_metrics_count_attempts_not_inferences(
     engine = DecisionEngine(settings, policy, evidence_source, judge=Judge(provider))
     client = TestClient(create_app(settings, policy, engine, store, None))
     assert (
-        client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
-        .status_code
+        client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396}).status_code
         == 200
     )
     metrics_text = TestClient(create_metrics_app(client.app.state.metrics)).get("/metrics").text
@@ -698,9 +677,7 @@ def test_model_metrics_record_fallback(settings, policy, evidence_source, store)
     from resolute.engine.engine import DecisionEngine
     from resolute.judge.judge import Judge
 
-    engine = DecisionEngine(
-        settings, policy, evidence_source, judge=Judge(CannedProvider("junk"))
-    )
+    engine = DecisionEngine(settings, policy, evidence_source, judge=Judge(CannedProvider("junk")))
     client = TestClient(create_app(settings, policy, engine, store, None))
     client.post("/api/decisions", json={"title": "Severance", "tmdb_id": 95396})
     metrics_text = TestClient(create_metrics_app(client.app.state.metrics)).get("/metrics").text

@@ -21,10 +21,15 @@ curl -s -X POST localhost:8080/api/decisions \
   "year": 2022,
   "final_resolution": "2160p",
   "confidence": "high",
-  "objective": {"resolution": "2160p", "confidence": "high",
-                "reasons": ["genre/keywords suggest strong visual payoff",
-                             "premium network/platform production values"]},
-  "household": {"resolution": "2160p", "confidence": "high", "reasons": ["..."]},
+  "objective": {
+    "resolution": "2160p",
+    "confidence": "high",
+    "reasons": [
+      "genre/keywords suggest strong visual payoff",
+      "premium network/platform production values"
+    ]
+  },
+  "household": { "resolution": "2160p", "confidence": "high", "reasons": ["..."] },
   "top_reasons": [
     "prestige sci-fi with a real UHD master",
     "household prose favors showcase quality here"
@@ -33,15 +38,21 @@ curl -s -X POST localhost:8080/api/decisions \
   "metadata_gaps": [],
   "mode": "shadow",
   "action_plan": [
-    {"type": "audit_sonarr_series_profile",
-     "params": {"expected_profile_name": "Ultra-HD"},
-     "requires_approval": false,
-     "note": "after Seerr routes the request, verify Sonarr ended up on the expected profile"}
+    {
+      "type": "audit_sonarr_series_profile",
+      "params": { "expected_profile_name": "Ultra-HD" },
+      "requires_approval": false,
+      "note": "after Seerr routes the request, verify Sonarr ended up on the expected profile"
+    }
   ],
   "shadow_delta": null,
   "feedback_options": ["agree", "prefer_1080p", "prefer_2160p", "manual_review"],
-  "model_involvement": {"used": true, "provider": "openai_compat",
-                        "model": "claude-haiku-4-5", "prompt_version": "judge_v2"}
+  "model_involvement": {
+    "used": true,
+    "provider": "openai_compat",
+    "model": "claude-haiku-4-5",
+    "prompt_version": "judge_v2"
+  }
 }
 ```
 
@@ -67,18 +78,24 @@ curl -s -X POST localhost:8080/api/webhooks/seerr \
   "confidence": "high",
   "mode": "shadow",
   "action_plan": [
-    {"type": "set_seerr_request_profile_2160p",
-     "params": {"seerr_request_id": 123, "profile_name": "Ultra-HD"},
-     "requires_approval": true,
-     "note": "set Seerr request 123 to profile 'Ultra-HD'"},
-    {"type": "approve_seerr_request",
-     "params": {"seerr_request_id": 123},
-     "requires_approval": true,
-     "note": "approve the Seerr request so it routes to Sonarr"},
-    {"type": "audit_sonarr_series_profile",
-     "params": {"expected_profile_name": "Ultra-HD"},
-     "requires_approval": false,
-     "note": "..."}
+    {
+      "type": "set_seerr_request_profile_2160p",
+      "params": { "seerr_request_id": 123, "profile_name": "Ultra-HD" },
+      "requires_approval": true,
+      "note": "set Seerr request 123 to profile 'Ultra-HD'"
+    },
+    {
+      "type": "approve_seerr_request",
+      "params": { "seerr_request_id": 123 },
+      "requires_approval": true,
+      "note": "approve the Seerr request so it routes to Sonarr"
+    },
+    {
+      "type": "audit_sonarr_series_profile",
+      "params": { "expected_profile_name": "Ultra-HD" },
+      "requires_approval": false,
+      "note": "..."
+    }
   ],
   "executed_actions": [],
   "shadow_delta": "no Sonarr series yet; Seerr request 123 (standard lane, profile_id=6) would get 'Ultra-HD'"

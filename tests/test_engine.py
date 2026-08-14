@@ -27,9 +27,7 @@ def test_end_to_end_showcase_decision(engine):
 
 
 def test_model_hold_request_is_honored(settings, policy, evidence_source):
-    judge = Judge(
-        CannedProvider(make_verdict("1080p", "medium", action="hold_for_manual_review"))
-    )
+    judge = Judge(CannedProvider(make_verdict("1080p", "medium", action="hold_for_manual_review")))
     engine = DecisionEngine(settings, policy, evidence_source, judge=judge)
     decision = engine.decide(DecisionRequest(title="The Bear", tmdb_id=136315))
     assert decision.final_resolution is Resolution.P1080
@@ -47,9 +45,7 @@ def test_model_disabled_degrades_to_conservative_fallback(engine_no_model):
     assert all(not a.is_write for a in decision.action_plan)
 
 
-def test_twice_invalid_output_degrades_to_conservative_fallback(
-    settings, policy, evidence_source
-):
+def test_twice_invalid_output_degrades_to_conservative_fallback(settings, policy, evidence_source):
     judge = Judge(CannedProvider("not json at all"))
     engine = DecisionEngine(settings, policy, evidence_source, judge=judge)
     decision = engine.decide(DecisionRequest(title="The Bear", tmdb_id=136315))

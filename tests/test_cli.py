@@ -72,9 +72,7 @@ def test_feedback_last_and_calibrate_and_overrides(env, fixtures_dir):
     )
     assert fb.exit_code == 0, fb.output
 
-    cal = runner.invoke(
-        app, ["calibrate", "--fixtures", str(fixtures_dir / "evidence")], env=env
-    )
+    cal = runner.invoke(app, ["calibrate", "--fixtures", str(fixtures_dir / "evidence")], env=env)
     assert cal.exit_code == 0
     summary = json.loads(cal.output)
     assert summary["feedback"] == 1
@@ -124,17 +122,13 @@ def test_fixtures_test_golden_suite(env, fixtures_dir):
 def test_execute_command_blocks_held_fallback_decision(env, fixtures_dir):
     assert _decide(env, fixtures_dir).exit_code == 0
     # the model-less decision is a conservative hold: execution refuses it
-    result = runner.invoke(
-        app, ["execute", "last", "--operator", "alex", "--yes"], env=env
-    )
+    result = runner.invoke(app, ["execute", "last", "--operator", "alex", "--yes"], env=env)
     assert result.exit_code == 1
     assert "blocked" in result.output
 
 
 def test_execute_command_unknown_decision(env):
-    result = runner.invoke(
-        app, ["execute", "NOPE", "--operator", "alex", "--yes"], env=env
-    )
+    result = runner.invoke(app, ["execute", "NOPE", "--operator", "alex", "--yes"], env=env)
     assert result.exit_code == 1
 
 
@@ -190,9 +184,7 @@ def test_review_pending_remote_no_token_sends_no_header(env, monkeypatch):
 
     monkeypatch.setattr(httpx, "post", fake_post)
     env_no_token = {k: v for k, v in env.items() if k != "RESOLUTE_API_TOKEN"}
-    result = runner.invoke(
-        app, ["review-pending", "--remote", "http://r"], env=env_no_token
-    )
+    result = runner.invoke(app, ["review-pending", "--remote", "http://r"], env=env_no_token)
     assert result.exit_code == 0, result.output
     assert seen["headers"] == {}
 
@@ -200,9 +192,7 @@ def test_review_pending_remote_no_token_sends_no_header(env, monkeypatch):
 def test_review_pending_remote_http_error_exits_nonzero(env, monkeypatch):
     import httpx
 
-    monkeypatch.setattr(
-        httpx, "post", lambda *a, **k: _FakeResponse(status_code=503, text="down")
-    )
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _FakeResponse(status_code=503, text="down"))
     result = runner.invoke(app, ["review-pending", "--remote", "http://r"], env=env)
     assert result.exit_code == 1
     assert "HTTP 503" in result.output

@@ -154,9 +154,7 @@ def plan_downgrade(
                     f"{len(queue)} item(s) queued for this series (reclaim may be in flight)"
                 )
             else:
-                report.blockers.append(
-                    f"{len(queue)} item(s) queued/downloading for this series"
-                )
+                report.blockers.append(f"{len(queue)} item(s) queued/downloading for this series")
     except SonarrError as exc:
         report.blockers.append(f"queue state unavailable: {exc}")
 
@@ -168,8 +166,7 @@ def plan_downgrade(
     uhd = [
         f
         for f in files
-        if ((f.get("quality") or {}).get("quality") or {}).get("resolution")
-        == _UHD_RESOLUTION
+        if ((f.get("quality") or {}).get("quality") or {}).get("resolution") == _UHD_RESOLUTION
     ]
     report.resident_uhd_files = len(uhd)
     report.resident_uhd_bytes = sum(int(f.get("size") or 0) for f in uhd)
@@ -209,8 +206,7 @@ def execute_downgrade(
     existing = store.get_downgrade(decision_id)
     if existing and existing["executed"]:
         raise DowngradeBlocked(
-            f"downgrade for Costanza decision {decision_id} already executed;"
-            " refusing to run twice"
+            f"downgrade for Costanza decision {decision_id} already executed; refusing to run twice"
         )
     resuming = existing is not None
 
@@ -220,9 +216,7 @@ def execute_downgrade(
     if not settings.allow_writes:
         raise DowngradeBlocked("allow_writes is false: downgrade forced to dry-run")
     if not settings.downgrade.admin_confirm_enabled:
-        raise DowngradeBlocked(
-            "downgrade.admin_confirm_enabled is false: report-only phase"
-        )
+        raise DowngradeBlocked("downgrade.admin_confirm_enabled is false: report-only phase")
 
     if resuming:
         report.notes.append(
@@ -268,8 +262,7 @@ def reconcile_downgrade(report: dict, sonarr: SonarrClient) -> dict:
     uhd = [
         f
         for f in files
-        if ((f.get("quality") or {}).get("quality") or {}).get("resolution")
-        == _UHD_RESOLUTION
+        if ((f.get("quality") or {}).get("quality") or {}).get("resolution") == _UHD_RESOLUTION
     ]
     remaining_bytes = sum(int(f.get("size") or 0) for f in uhd)
     on_target = series.get("qualityProfileId") == report.get("target_profile_id")

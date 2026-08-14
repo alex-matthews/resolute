@@ -195,9 +195,7 @@ class Store:
                 " WHERE decision_id=? ORDER BY executed_at",
                 (decision_id,),
             ).fetchall()
-        return [
-            {"executed_at": r[0], "actions": json.loads(r[1]), "operator": r[2]} for r in rows
-        ]
+        return [{"executed_at": r[0], "actions": json.loads(r[1]), "operator": r[2]} for r in rows]
 
     # -- feedback ----------------------------------------------------------
 
@@ -235,9 +233,7 @@ class Store:
                     audit_payload.get("tvdb_id"),
                     audit_payload.get("expected_profile"),
                     audit_payload.get("actual_profile"),
-                    None
-                    if audit_payload.get("matches") is None
-                    else int(audit_payload["matches"]),
+                    None if audit_payload.get("matches") is None else int(audit_payload["matches"]),
                     json.dumps(audit_payload),
                 ),
             )
@@ -324,9 +320,7 @@ class Store:
             ).fetchone()
         if row is None:
             return None
-        steps = [
-            step for step, done in zip(self._DOWNGRADE_STEPS, (row[3], row[4])) if done
-        ]
+        steps = [step for step, done in zip(self._DOWNGRADE_STEPS, (row[3], row[4])) if done]
         return {
             "created_at": row[0],
             "operator": row[1],

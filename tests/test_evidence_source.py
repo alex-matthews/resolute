@@ -31,8 +31,12 @@ class FakeSonarrClient:
     def __init__(self, series=None, diskspace=None):
         self._series = series
         self._diskspace = diskspace or [
-            {"path": "/media", "label": "media", "freeSpace": 2_000_000_000_000,
-             "totalSpace": 8_000_000_000_000}
+            {
+                "path": "/media",
+                "label": "media",
+                "freeSpace": 2_000_000_000_000,
+                "totalSpace": 8_000_000_000_000,
+            }
         ]
 
     def get_series_by_tvdb(self, tvdb_id):

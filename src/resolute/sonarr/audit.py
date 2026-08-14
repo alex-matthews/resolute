@@ -48,11 +48,7 @@ def audit_series_profile(
     profile_name_2160p: str,
     tvdb_id: int | None = None,
 ) -> AuditResult:
-    expected = (
-        profile_name_2160p
-        if expected_resolution is Resolution.P2160
-        else profile_name_1080p
-    )
+    expected = profile_name_2160p if expected_resolution is Resolution.P2160 else profile_name_1080p
     if not state.exists:
         return AuditResult(
             tvdb_id=tvdb_id,

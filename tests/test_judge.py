@@ -7,8 +7,16 @@ from resolute.schemas import EvidenceBundle, ShowFacts
 
 VALID = json.dumps(
     {
-        "objective": {"resolution": "2160p", "confidence": "medium", "reasons": ["visual showcase"]},
-        "household": {"resolution": "2160p", "confidence": "medium", "reasons": ["likely favorite"]},
+        "objective": {
+            "resolution": "2160p",
+            "confidence": "medium",
+            "reasons": ["visual showcase"],
+        },
+        "household": {
+            "resolution": "2160p",
+            "confidence": "medium",
+            "reasons": ["likely favorite"],
+        },
         "automation": {
             "resolution": "2160p",
             "confidence": "medium",

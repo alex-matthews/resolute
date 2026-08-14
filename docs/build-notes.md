@@ -22,14 +22,15 @@ precedent.
 - **Base image (H3):** `python:3.14-slim` → `python:3.14-alpine3.24`
   (SHA-pinned), uv multi-stage kept. No musl wheel issues; the existing
   uv.lock resolved unchanged.
-- **No baked config (H4):** `COPY config/policy.example.yaml
-  /config/policy.yaml` removed. `load_policy(..., required=True)` on the
+- **No baked config (H4):** Removed the image-layer copy of
+  `config/policy.example.yaml` to `/config/policy.yaml`.
+  `load_policy(..., required=True)` on the
   production serve path fails fast with a clear error when the ConfigMap
   mount is missing (silently scoring with a default policy was the worse
   failure mode); ad-hoc CLI/fixture runs keep the tolerant default.
 - **K8s-constraint smoke (H6):** `scripts/k8s-smoke.sh` + mise
-  `k8s-smoke` + CI container-job step: `--user 1032:100 --read-only
-  --cap-drop ALL`, no HOME, only /data writable, policy mounted
+  `k8s-smoke` + CI container-job step: `--user 1032:100`, `--read-only`,
+  and `--cap-drop ALL`; no HOME, only /data writable, policy mounted
   read-only; asserts probes, DB creation, clean logs.
 - **volsync posture (H7):** documented in docs/deployment.md — Snapshot
   copyMethod crash consistency, WAL sidecar expectations, concrete
