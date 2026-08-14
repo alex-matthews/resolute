@@ -1,0 +1,371 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      container: ${{ steps.changes.outputs.container }}
+      dockerfile: ${{ steps.changes.outputs.dockerfile }}
+      format: ${{ steps.changes.outputs.format }}
+      manifests: ${{ steps.changes.outputs.manifests }}
+      python: ${{ steps.changes.outputs.python }}
+      shell: ${{ steps.changes.outputs.shell }}
+      workflows: ${{ steps.changes.outputs.workflows }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Workflow-level path filters do not report a check at all, which makes
+      # them unsafe with required status checks. Classify changes once and use
+      # job-level conditions instead: skipped jobs still report a terminal
+      # result and the Build Success fan-in can safely gate every pull request.
+      - name: Classify changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          run_container=false
+          run_dockerfile=false
+          run_format=false
+          run_manifests=false
+          run_python=false
+          run_shell=false
+          run_workflows=false
+
+          set_all() {
+            run_container=true
+            run_dockerfile=true
+            run_format=true
+            run_manifests=true
+            run_python=true
+            run_shell=true
+            run_workflows=true
+          }
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] ||
+             [[ -z "${BASE_SHA}" ]] ||
+             [[ "${BASE_SHA}" =~ ^0+$ ]] ||
+             ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            set_all
+          else
+            while IFS= read -r -d '' changed_path; do
+              case "${changed_path}" in
+                *.md | *.markdown | *.mdx)
+                  run_format=true
+                  ;;
+              esac
+
+              case "${changed_path}" in
+                src/* | tests/* | fixtures/* | config/* | pyproject.toml | uv.lock | .python-version)
+                  run_python=true
+                  ;;
+              esac
+
+              case "${changed_path}" in
+                Dockerfile | .dockerignore | README.md | src/* | config/* | pyproject.toml | uv.lock | scripts/k8s-smoke.sh)
+                  run_container=true
+                  ;;
+              esac
+
+              case "${changed_path}" in
+                deploy/* | scripts/kubeconform.sh)
+                  run_manifests=true
+                  ;;
+              esac
+
+              case "${changed_path}" in
+                Dockerfile)
+                  run_dockerfile=true
+                  ;;
+              esac
+
+              case "${changed_path}" in
+                scripts/*.sh)
+                  run_shell=true
+                  ;;
+              esac
+
+              case "${changed_path}" in
+                .github/workflows/*.yaml | .github/workflows/*.yml)
+                  run_workflows=true
+                  ;;
+              esac
+
+              case "${changed_path}" in
+                .editorconfig | .lefthook.toml | .oxfmtrc.json | .prettierignore)
+                  run_format=true
+                  ;;
+                .mise/config.toml | .mise/mise.lock)
+                  set_all
+                  ;;
+              esac
+            done < <(git diff --name-only -z "${BASE_SHA}" "${GITHUB_SHA}")
+          fi
+
+          {
+            echo "container=${run_container}"
+            echo "dockerfile=${run_dockerfile}"
+            echo "format=${run_format}"
+            echo "manifests=${run_manifests}"
+            echo "python=${run_python}"
+            echo "shell=${run_shell}"
+            echo "workflows=${run_workflows}"
+          } >> "${GITHUB_OUTPUT}"
+
+  file-format:
+    if: ${{ needs.prepare.outputs.format == 'true' }}
+    name: Markdown Format
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Mise
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          experimental: true
+          install_args: --locked
+
+      - name: Check authored Markdown formatting
+        run: mise run markdown-format-check
+
+  python-lint:
+    if: ${{ needs.prepare.outputs.python == 'true' }}
+    name: Python Lint & Format
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Mise
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          experimental: true
+          install_args: --locked
+
+      - name: Install locked dependencies
+        run: mise run sync
+
+      - name: Run ruff lint
+        run: mise run lint
+
+      - name: Check ruff formatting
+        run: mise run python-format-check
+
+  python-test:
+    if: ${{ needs.prepare.outputs.python == 'true' }}
+    name: Python Tests
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Mise
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          experimental: true
+          install_args: --locked
+
+      - name: Check lockfile is current
+        run: uv lock --check
+
+      - name: Install locked dependencies
+        run: mise run sync
+
+      - name: Run unit tests
+        run: mise run test
+
+      - name: Run canned-verdict pipeline fixtures
+        run: mise run golden
+
+  repository-lint:
+    if: >-
+      ${{ needs.prepare.outputs.dockerfile == 'true' ||
+      needs.prepare.outputs.shell == 'true' ||
+      needs.prepare.outputs.workflows == 'true' }}
+    name: Repository Lint
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Mise
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          experimental: true
+          install_args: --locked
+
+      - name: Run hadolint
+        if: ${{ needs.prepare.outputs.dockerfile == 'true' }}
+        run: mise run dockerfile-lint
+
+      - name: Run ShellCheck
+        if: ${{ needs.prepare.outputs.shell == 'true' }}
+        run: mise run shell-lint
+
+      - name: Run actionlint and zizmor
+        if: ${{ needs.prepare.outputs.workflows == 'true' }}
+        run: mise run workflow-lint
+
+  manifests:
+    if: ${{ needs.prepare.outputs.manifests == 'true' }}
+    name: Helm Render + Kubeconform
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Mise
+        uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          experimental: true
+          install_args: --locked
+
+      - name: Render app-template and validate manifests
+        run: mise run kubeconform
+
+  container:
+    if: ${{ needs.prepare.outputs.container == 'true' }}
+    name: Container Build & Scan
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: false
+          load: true
+          tags: resolute:ci
+          platforms: linux/amd64
+
+      # Run the image the way the cluster will: arbitrary uid 1032:100,
+      # read-only rootfs, no HOME, only /data writable, household prose ro.
+      - name: Kubernetes-constraint smoke
+        env:
+          IMAGE: resolute:ci
+          IMAGE_PREBUILT: "1"
+        run: bash scripts/k8s-smoke.sh
+
+      - name: Trivy gate — fixable HIGH/CRITICAL fail the build
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: resolute:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+
+  filesystem:
+    name: Trivy Filesystem Scan
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run Trivy (deps, secrets, IaC)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-fs.sarif
+          exit-code: "0"
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  status:
+    if: ${{ !cancelled() }}
+    name: Build Success
+    needs:
+      - prepare
+      - file-format
+      - python-lint
+      - python-test
+      - repository-lint
+      - manifests
+      - container
+      - filesystem
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Any jobs failed?
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
+
+      - name: All jobs passed or skipped?
+        if: ${{ !(contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+        run: echo "All jobs passed or skipped" && echo "${{ toJSON(needs.*.result) }}"
