@@ -22,7 +22,7 @@ permissions:
 jobs:
   prepare:
     name: Prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     outputs:
@@ -141,7 +141,7 @@ jobs:
     if: ${{ needs.prepare.outputs.format == 'true' }}
     name: Markdown Format
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -163,7 +163,7 @@ jobs:
     if: ${{ needs.prepare.outputs.python == 'true' }}
     name: Python Lint & Format
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -191,7 +191,7 @@ jobs:
     if: ${{ needs.prepare.outputs.python == 'true' }}
     name: Python Tests
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -225,7 +225,7 @@ jobs:
       needs.prepare.outputs.workflows == 'true' }}
     name: Repository Lint
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -256,7 +256,7 @@ jobs:
     if: ${{ needs.prepare.outputs.manifests == 'true' }}
     name: Helm Render + Kubeconform
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -278,7 +278,7 @@ jobs:
     if: ${{ needs.prepare.outputs.container == 'true' }}
     name: Container Build & Scan
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -320,7 +320,7 @@ jobs:
   filesystem:
     name: Trivy Filesystem Scan
     needs: prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       security-events: write
@@ -362,7 +362,7 @@ jobs:
       - manifests
       - container
       - filesystem
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - name: Any jobs failed?
