@@ -33,7 +33,7 @@ jobs:
       packages: write
     # Docker-maintained reusable build workflow: multi-arch buildx, SBOM,
     # provenance attestation, and cosign keyless signing in one place.
-    uses: docker/github-builder/.github/workflows/build.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
+    uses: docker/github-builder/.github/workflows/build.yml@4345a1cea1e4cfb65c8a5e2b1b80f9e630068827 # v1.18.0
     with:
       build-args: |
         VERSION=${{ github.ref_name }}
